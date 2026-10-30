@@ -1,6 +1,27 @@
 # intro
 
 - 프로젝트들의 docker compose들을 관리
+- `docker run`에 옵션으로 붙이던 컨테이너 설정을 `compose.yaml` 파일로 적어 두고, `docker compose up -d` 한 줄로 띄움
+
+## docker run 대신 compose로 관리하는 이유
+
+- **설정이 파일로 남음**: 어떤 옵션으로 띄웠는지 `docker inspect`로 찾아볼 필요가 없음
+- **git으로 관리됨**: 버전, 포트, 경로를 바꾼 기록이 남음
+- **다시 만들기 쉬움**: 이미지 태그만 고치고 `docker compose up -d` 하면 기존 컨테이너를 지우고 새로 만듦. `docker run`은 stop, rm, run을 직접 해야 함
+- **비밀번호가 분리됨**: 값은 `.env`에 따로 두므로 명령어 기록이나 저장소에 남지 않음
+
+## docker run 옵션과의 대응
+
+| `docker run` 옵션 | `compose.yaml` |
+| --- | --- |
+| `--name postgres_choimory` | `container_name: postgres_choimory` |
+| `-p 127.0.0.1:5432:5432` | `ports:` |
+| `-v ~/...:/var/lib/postgresql/data` | `volumes:` |
+| `-e POSTGRES_PASSWORD=...` | `environment:` (값은 `.env`에서) |
+| `--restart always` | `restart: always` |
+| `postgres:16.15-bookworm` | `image: postgres:16.15-bookworm` |
+
+- 한 번 `up -d` 하면 `restart` 정책에 따라 재부팅 후에도 자동으로 뜸. `docker compose down`을 하면 컨테이너가 삭제되어 다시 `up -d` 필요
 
 ---
 
@@ -138,12 +159,14 @@ choimory-docker-compose/
 - 로컬 개발할 때 쓰는 개인 어플리케이션 모음
 - 필요한 것만 골라 띄울 수 있도록 서비스별 디렉토리로 분리하며, 각 디렉토리에서 `docker compose up -d`로 기동
 - 서비스 간 네트워크는 공유하지 않음. 앱과 DataGrip은 `localhost:포트`로 접속
+- 서비스마다 컨테이너가 하나라, 사실상 `docker run` 명령을 파일로 관리하는 용도
+- `restart: always`라 재부팅 후에도 자동으로 뜸. Docker Desktop > Settings > General > Start Docker Desktop when you sign in to your computer 설정 필요
 
 ## 서비스 목록
 
 | 서비스 | 이미지 | 호스트 바인딩 | container_name | 데이터 경로 |
 | --- | --- | --- | --- | --- |
-| PostgreSQL | `postgres:16.15` | 127.0.0.1:5432 | postgres_choimory | `docker_volume/postgres` |
+| PostgreSQL | `postgres:16.15-bookworm` | 127.0.0.1:5432 | postgres_choimory | `docker_volume/postgres` |
 | Redis | `redis:8.10.3` | 127.0.0.1:6379 | redis_choimory | `docker_volume/redis` |
 | Elasticsearch | `elasticsearch:8.19.23` | 127.0.0.1:9200 | elasticsearch_choimory | `docker_volume/elasticsearch` |
 | MySQL | `mysql:8.4.13` | 127.0.0.1:3306 | mysql_choimory | `docker_volume/mysql` |
@@ -176,7 +199,7 @@ choimory-docker-compose/
 
 ## 서비스별 참고
 
-- **PostgreSQL**: 메이저 버전 16 유지. 17 이상으로 올리려면 dump/restore 필요. `POSTGRES_USER`, `POSTGRES_PASSWORD`는 데이터 디렉토리가 비어 있을 때만 적용
+- **PostgreSQL**: 메이저 버전 16 유지. 기존 데이터와 collation을 맞추기 위해 OS는 Debian bookworm(`-bookworm` 태그)으로 고정. 17 이상으로 올리려면 dump/restore 필요. `POSTGRES_USER`, `POSTGRES_PASSWORD`는 데이터 디렉토리가 비어 있을 때만 적용
 - **Redis**: ACL로 `REDIS_USER` 계정 인증을 걸고 `default` 계정은 끔. 앱에는 username, password를 둘 다 설정. 기본 RDB 스냅샷을 `/data`에 저장
 - **Elasticsearch**
   - 단일 노드. 9300(노드 간 통신)은 열지 않음

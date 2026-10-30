@@ -1,6 +1,27 @@
 # 개요
 
 - 로컬에서 개발할때 띄우는 db 등의 compose 관리
+- `docker run`에 옵션으로 붙이던 컨테이너 설정을 `compose.yaml` 파일로 적어 두고, `docker compose up -d` 한 줄로 띄움
+- 서비스마다 컨테이너가 하나라, 사실상 `docker run` 명령을 파일로 관리하는 용도
+- 한 번 `up -d` 하면 `restart: always`로 재부팅 후에도 자동으로 뜸 (Docker Desktop 로그인 시 자동 시작 설정 필요)
+
+## docker run 대신 compose로 관리하는 이유
+
+- **설정이 파일로 남음**: 어떤 옵션으로 띄웠는지 `docker inspect`로 찾아볼 필요가 없음
+- **git으로 관리됨**: 버전, 포트, 경로를 바꾼 기록이 남음
+- **다시 만들기 쉬움**: 이미지 태그만 고치고 `docker compose up -d` 하면 기존 컨테이너를 지우고 새로 만듦. `docker run`은 stop, rm, run을 직접 해야 함
+- **비밀번호가 분리됨**: 값은 `.env`에 따로 두므로 명령어 기록이나 저장소에 남지 않음
+
+## docker run 옵션과의 대응
+
+| `docker run` 옵션 | `compose.yaml` |
+| --- | --- |
+| `--name postgres_choimory` | `container_name: postgres_choimory` |
+| `-p 127.0.0.1:5432:5432` | `ports:` |
+| `-v ~/...:/var/lib/postgresql/data` | `volumes:` |
+| `-e POSTGRES_PASSWORD=...` | `environment:` (값은 `.env`에서) |
+| `--restart always` | `restart: always` |
+| `postgres:16.15-bookworm` | `image: postgres:16.15-bookworm` |
 
 ---
 
@@ -38,7 +59,7 @@ choimory-local/
 
 | 서비스 | 이미지 | 프로젝트명 | container_name | 호스트 바인딩 | 컨테이너 데이터 경로 |
 | --- | --- | --- | --- | --- | --- |
-| PostgreSQL | `postgres:16.15` | local-postgres | postgres_choimory | 127.0.0.1:5432 | `/var/lib/postgresql/data` |
+| PostgreSQL | `postgres:16.15-bookworm` | local-postgres | postgres_choimory | 127.0.0.1:5432 | `/var/lib/postgresql/data` |
 | Redis | `redis:8.10.3` | local-redis | redis_choimory | 127.0.0.1:6379 | `/data` |
 | Elasticsearch | `elasticsearch:8.19.23` | local-elasticsearch | elasticsearch_choimory | 127.0.0.1:9200 | `/usr/share/elasticsearch/data` |
 | MySQL | `mysql:8.4.13` | local-mysql | mysql_choimory | 127.0.0.1:3306 | `/var/lib/mysql` |
@@ -127,6 +148,9 @@ docker ps --filter name=_choimory   # 로컬 DB 컨테이너 전체 확인
 
 - 메이저 버전 16 유지. 17 이상으로 올리려면 데이터 디렉토리 호환이 안 되므로 dump/restore 필요
 - 마이너 버전(16.x)은 이미지 태그만 바꿔서 올려도 됨
+- OS는 기존 데이터를 만든 이미지와 같은 Debian bookworm으로 고정함 (`-bookworm` 태그)
+  - 기본 태그는 trixie 기반이라 glibc가 달라 collation이 바뀜. 기존 텍스트 인덱스가 어긋나고 `collation version mismatch` 경고가 뜰 수 있음
+  - OS를 바꿔야 하면 `REINDEX DATABASE` 후 `ALTER DATABASE <db> REFRESH COLLATION VERSION` 실행
 
 ## Redis
 
