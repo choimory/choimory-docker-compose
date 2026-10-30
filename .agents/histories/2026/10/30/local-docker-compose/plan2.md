@@ -49,6 +49,33 @@
   - [답변](#답변-10)
   - [대응 관계](#대응-관계)
   - [yaml로 바꿔서 좋은 점](#yaml로-바꿔서-좋은-점)
+- [복사한 데이터가 버전, 계정 차이로 문제 되는지](#복사한-데이터가-버전-계정-차이로-문제-되는지)
+  - [답변](#답변-11)
+  - [PostgreSQL: 16.9 → 16.15](#postgresql-169--1615)
+  - [Elasticsearch: 8.12.2 → 8.19.23](#elasticsearch-8122--81923)
+  - [Redis, MySQL](#redis-mysql)
+  - [복사 시점 확인](#복사-시점-확인)
+- [Postgres 이미지를 bookworm으로 변경](#postgres-이미지를-bookworm으로-변경)
+  - [답변](#답변-12)
+  - [변경한 파일](#변경한-파일-1)
+  - [이미 띄운 경우](#이미-띄운-경우)
+- [choimory-local README 개요에 compose 존재 의의 작성](#choimory-local-readme-개요에-compose-존재-의의-작성)
+  - [답변](#답변-13)
+- [루트 README에 compose 존재 의의 작성](#루트-readme에-compose-존재-의의-작성)
+  - [답변](#답변-14)
+- [ES 계정명](#es-계정명)
+  - [답변](#답변-15)
+  - [다른 계정을 쓰려면](#다른-계정을-쓰려면)
+- [ES 계정명 추가 방식](#es-계정명-추가-방식)
+  - [답변](#답변-16)
+  - [1. 기록만 추가](#1-기록만-추가)
+  - [2. 내 계정을 자동으로 생성](#2-내-계정을-자동으로-생성)
+- [ES 기본 계정명 변경 가능 여부](#es-기본-계정명-변경-가능-여부)
+  - [답변](#답변-17)
+  - [API로 생성 (native realm)](#api로-생성-native-realm)
+  - [파일로 정의 (file realm)](#파일로-정의-file-realm)
+- [ES 계정 결정](#es-계정-결정)
+  - [답변](#답변-18)
 
 ---
 
@@ -456,5 +483,198 @@ Postgres 예시
 - **비밀번호가 파일에서 분리됨**: `.env`에 따로 두므로 명령어 기록이나 저장소에 남지 않음
 
 compose는 원래 여러 컨테이너를 묶어서 띄우는 도구이지만, 지금은 서비스마다 컨테이너가 하나라 사실상 "`docker run`을 파일로 적어 둔 것"으로 보면 됨
+
+---
+
+# 복사한 데이터가 버전, 계정 차이로 문제 되는지
+
+> 궁금한게 이전 도커 볼륨 cp해놨는데 버전 다르거나 계정설정같은거 달라서 문제 생기는거 아님?
+
+## 답변
+
+대부분 그대로 쓸 수 있음. 다만 Postgres는 이미지의 OS 차이로 문제가 생길 수 있어 태그 변경을 권함
+
+## PostgreSQL: 16.9 → 16.15
+
+- **버전**: 같은 16 안의 업데이트라 데이터 형식이 같음. 그대로 뜸
+- **계정**: 기존 데이터에 `choimory` 계정과 비밀번호가 있음. `.env` 값은 무시되고 기존 정보로 접속
+- **OS 차이**
+  - 기존 이미지는 Debian bookworm 기반(`PG_VERSION=16.9-1.pgdg120`)
+  - `postgres:16.15` 태그는 trixie 기반 (Docker Hub에서 `16.15`와 `16.15-trixie`가 같은 digest)
+  - OS가 바뀌면 glibc 버전이 바뀌어 문자열 정렬 규칙(collation)이 달라질 수 있음
+  - 접속할 때 `collation version mismatch` 경고가 뜨고, 텍스트 컬럼 인덱스 순서가 어긋나면 검색 결과 누락이나 unique 제약 깨짐이 생길 수 있음
+  - `postgres:16.15-bookworm` 태그로 바꾸면 기존과 같은 OS라 문제없음
+
+## Elasticsearch: 8.12.2 → 8.19.23
+
+- **버전**: 같은 8 안의 업그레이드는 공식 지원 경로. 첫 기동 때 데이터가 새 형식으로 바뀌어 되돌릴 수 없음
+- **계정**: 기존은 `xpack.security.enabled=false`라 데이터에 보안 정보(`.security` 인덱스)가 없음. 처음 보안을 켜면 `.env`의 `ELASTIC_PASSWORD`가 `elastic` 비밀번호가 됨
+- **실행 계정**: 기존과 새 이미지 모두 `1000:0`이라 권한 문제 없음
+
+## Redis, MySQL
+
+- 데이터를 옮기지 않으므로 해당 없음
+
+## 복사 시점 확인
+
+- 기존 컨테이너를 멈추지 않고 복사했다면 파일이 중간 상태로 복사됐을 수 있음
+- 그 경우 `docker stop` 후 복사본을 지우고 다시 복사
+
+---
+
+# Postgres 이미지를 bookworm으로 변경
+
+> bookworm으로 바꿔줘
+
+## 답변
+
+`postgres:16.15-bookworm`으로 변경함. 실행은 하지 않음
+
+## 변경한 파일
+
+- **choimory-local/postgres/compose.yaml**: 태그 변경, bookworm으로 고정한 이유 주석 추가
+  ```yaml
+      # 기존 이미지와 같은 Debian bookworm 기반으로 고정한다. 기본 태그(trixie)는 glibc가 달라
+      # 문자열 정렬 규칙(collation)이 바뀌어 기존 텍스트 인덱스가 어긋날 수 있다.
+      image: postgres:16.15-bookworm
+  ```
+- **choimory-local/README.md**: 서비스 목록 이미지 수정. PostgreSQL 참고에 bookworm 고정 이유와, OS를 바꿔야 할 때 `REINDEX DATABASE` 후 `ALTER DATABASE <db> REFRESH COLLATION VERSION` 실행 추가
+- **루트 README.md**: 서비스 목록 이미지와 PostgreSQL 참고 수정
+
+## 이미 띄운 경우
+
+- 예전 태그(trixie)로 띄웠다면 `docker compose down` 후 `docker compose up -d`로 다시 띄움
+- 그동안 데이터를 썼다면 원본에서 다시 복사해 띄우는 쪽이 안전함
+
+---
+
+# choimory-local README 개요에 compose 존재 의의 작성
+
+> 그리고 아까 질의응답했을때 이 docker compose가 docker run 명령어 대신 파일로 관리한다는 등의 내용을 choimory-local/readme.md 개요에도 적어줘. 이 도커 컴포즈 야믈파일의 존재의의같은거
+
+## 답변
+
+기존 개요 한 줄은 그대로 두고 아래 내용을 추가함
+
+- 개요에 3줄 추가
+  - `docker run` 옵션을 `compose.yaml`로 적어 두고 `docker compose up -d` 한 줄로 띄움
+  - 서비스마다 컨테이너가 하나라 사실상 `docker run` 명령을 파일로 관리하는 용도
+  - `restart: always`로 재부팅 후에도 자동으로 뜸 (Docker Desktop 로그인 시 자동 시작 설정 필요)
+- `## docker run 대신 compose로 관리하는 이유`: 설정이 파일로 남음, git으로 관리됨, 다시 만들기 쉬움, 비밀번호가 분리됨
+- `## docker run 옵션과의 대응`: Postgres 예시 표 (이미지는 `16.15-bookworm`)
+
+---
+
+# 루트 README에 compose 존재 의의 작성
+
+> 루트 readme에도 이런 내용 추가해줘
+
+## 답변
+
+- **`# intro`**: 저장소 전체(local, server 공통) 내용이라 이곳에 추가
+  - `docker run` 옵션을 `compose.yaml`로 적어 두고 `docker compose up -d`로 띄운다는 한 줄
+  - `## docker run 대신 compose로 관리하는 이유`, `## docker run 옵션과의 대응`
+  - 재부팅 후 자동 기동 한 줄. server는 `unless-stopped`, local은 `always`라 "`restart` 정책에 따라"로 적음. `down`하면 다시 `up -d` 필요
+- **`# choimory-local` > `## 개요`**: 맥북 전용 내용 두 줄
+  - 사실상 `docker run`을 파일로 관리하는 용도
+  - `restart: always`, Docker Desktop 자동 시작 설정 필요
+
+---
+
+# ES 계정명
+
+> es는 계정명은 없고 비밀번호만 있음?
+
+## 답변
+
+계정명은 있음. `elastic`으로 고정되어 있어 따로 설정하지 않을 뿐
+
+- 보안을 켜면 `elastic` 슈퍼유저 계정이 기본으로 있음
+- `ELASTIC_PASSWORD`는 이 계정의 비밀번호를 정하는 변수
+- 계정명을 바꾸는 환경변수는 없음 (Postgres의 `POSTGRES_USER`, Redis의 `REDIS_USER` 같은 것이 없음)
+- 접속
+  - curl: `curl -u elastic:<비밀번호> localhost:9200`
+  - Spring: `spring.elasticsearch.username=elastic`, `spring.elasticsearch.password=<비밀번호>`
+
+## 다른 계정을 쓰려면
+
+ES 기동 후 `elastic` 계정으로 API를 호출해 새 계정 생성
+
+```bash
+curl -u elastic:<비밀번호> -X POST localhost:9200/_security/user/choimory \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"<비밀번호>","roles":["superuser"]}'
+```
+
+- 계정은 ES 데이터(`.security` 인덱스)에 저장되어 재기동해도 유지됨
+- compose만으로 자동 생성되지는 않아서 데이터를 초기화하면 다시 만들어야 함
+
+로컬 개발용이라 `elastic`을 그대로 쓰는 것을 권함
+
+---
+
+# ES 계정명 추가 방식
+
+> 계정명도 추가해줘
+
+## 답변
+
+두 가지로 해석될 수 있어 어느 쪽인지 확인함
+
+## 1. 기록만 추가
+
+- `elastic`을 그대로 쓰고, `.env.example`과 README에 계정명이 `elastic` 고정이라고 적음
+  ```
+  # 계정명은 elastic 고정 (변경 불가)
+  # 사용 시 변경 (elastic 계정 비밀번호)
+  ELASTIC_PASSWORD=changeme
+  ```
+
+## 2. 내 계정을 자동으로 생성
+
+- `.env`에 `ES_USER`, `ES_PASSWORD`를 두고 앱은 이 계정으로 접속
+- compose에 계정 생성 전용 컨테이너(`elasticsearch-init`) 추가
+  - ES가 healthy가 되면 `elastic` 계정으로 `PUT _security/user/${ES_USER}` 호출 후 종료
+  - 기동할 때마다 실행되며 덮어쓰기라 비밀번호 변경도 반영됨
+- ES healthcheck 추가 필요, `elastic` 비밀번호도 관리용으로 남아 변수가 3개가 됨
+- 종료된 init 컨테이너가 `docker ps -a`에 남음
+- 권한(`superuser` 또는 인덱스 읽기·쓰기만)도 정해야 함
+
+---
+
+# ES 기본 계정명 변경 가능 여부
+
+> es는 계정명 따로 변경하는게 없나?
+
+## 답변
+
+없음. 내장 예약 계정이라 환경변수, 설정 파일, API 어느 쪽으로도 `elastic`의 이름은 바꿀 수 없음. 다른 계정명을 쓰려면 새 계정을 따로 만들어야 함
+
+## API로 생성 (native realm)
+
+- `PUT _security/user/<계정명>` 방식
+- 계정이 ES 데이터(`.security` 인덱스)에 저장됨
+- 자동 생성하려면 init 컨테이너 필요
+
+## 파일로 정의 (file realm)
+
+- ES 설정 디렉토리의 `users`, `users_roles` 파일에 계정을 적는 방식
+- compose `command`에서 ES 기동 전에 `elasticsearch-users useradd ${ES_USER} -p ${ES_PASSWORD} -r superuser` 실행. 별도 컨테이너 불필요
+- 계정이 데이터가 아니라 설정 파일에 있어서, 데이터를 초기화해도 `.env` 값으로 다시 만들어짐
+- `command`가 길어지고, 재시작 시 "이미 있는 계정" 처리가 필요함
+
+어느 쪽이든 `elastic` 계정은 남으며 관리용으로 두는 것이 일반적. 새 계정을 만든다면 file realm을 권함
+
+---
+
+# ES 계정 결정
+
+> 그냥 elastic 쓸게
+
+## 답변
+
+- ES는 기본 계정 `elastic`을 그대로 사용함
+- 별도 계정 생성(native realm, file realm)은 하지 않음
+- 앱과 클라이언트는 `elastic` / `ELASTIC_PASSWORD`로 접속
 
 ---
