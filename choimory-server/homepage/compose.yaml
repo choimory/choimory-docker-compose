@@ -1,0 +1,31 @@
+# Homepage: choimory-server 서비스 링크 대시보드
+# 서비스 목록은 /data/apps/homepage/config/services.yaml 등 설정 파일로 관리한다. (최초 기동 시 기본 파일 자동 생성)
+#
+# 접속: LAN, Tailscale (http://<서버 IP>:3000)
+#
+# 사전 준비
+#   mkdir -p /data/apps/homepage/config
+name: homepage
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:v2.7.0
+    container_name: homepage
+    restart: unless-stopped
+
+    # 링크 모음만 제공하므로 LAN 기기에서도 접근할 수 있게 전체 인터페이스에 바인딩한다.
+    ports:
+      - "3000:3000"
+
+    # Docker 소켓은 마운트하지 않는다.
+    # 컨테이너 상태 표시가 필요해지면 소켓을 직접 넣지 말고 docker-socket-proxy를 붙인다.
+    volumes:
+      - /data/apps/homepage/config:/app/config
+
+    environment:
+      # Homepage는 linuxserver 이미지처럼 PUID/PGID를 지원한다. (choimory:homeserver)
+      PUID: 1000
+      PGID: 1500
+      TZ: Asia/Seoul
+      # 허용하지 않은 Host 헤더로 접속하면 Homepage가 요청을 거부한다. 접속 주소가 바뀌면 같이 수정한다.
+      HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS}

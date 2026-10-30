@@ -1,0 +1,31 @@
+# File Browser: 웹 브라우저용 개인 파일 접근
+# 파일 탐색의 주 수단은 Samba이고, File Browser는 Samba가 없는 기기에서 가끔 쓰는 용도다.
+#
+# 접속: LAN, Tailscale (http://<서버 IP>:8081)
+# 최초 admin 비밀번호는 첫 기동 로그에 출력된다: docker logs filebrowser
+#
+# 사전 준비
+#   mkdir -p /data/apps/filebrowser/{database,config}
+name: filebrowser
+
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:v2.63.23
+    container_name: filebrowser
+    restart: unless-stopped
+
+    # 기본 이미지(s6 아님)는 PUID/PGID를 지원하지 않으므로 user로 실행 계정을 지정한다. (choimory:homeserver)
+    user: "1000:1500"
+
+    ports:
+      - "8081:80"
+
+    volumes:
+      # 개인 문서 디렉토리만 노출한다.
+      # Immich가 관리하는 photos나 media를 여기서 지우거나 옮기면 Immich, Jellyfin 데이터가 깨질 수 있다.
+      - /data/nas/files:/srv
+      - /data/apps/filebrowser/database:/database
+      - /data/apps/filebrowser/config:/config
+
+    environment:
+      TZ: Asia/Seoul

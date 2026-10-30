@@ -1,0 +1,40 @@
+# Vaultwarden: 비밀번호 관리자 (Bitwarden 호환)
+# 웹 볼트와 Bitwarden 앱은 HTTPS가 필수라 tailscale serve로 TLS를 처리한다.
+#
+# 접속: Tailscale 전용
+#   Tailscale 관리 콘솔 > DNS > HTTPS Certificates 활성화 필요
+#   sudo tailscale serve --bg --https=8443 http://127.0.0.1:8080
+#   → https://choimory-server.<tailnet>.ts.net:8443
+#
+# 계정 생성 순서
+#   1. SIGNUPS_ALLOWED=true로 기동 후 본인 계정 생성
+#   2. SIGNUPS_ALLOWED=false로 바꾸고 docker compose up -d로 재기동
+#
+# 사전 준비
+#   mkdir -p /data/apps/vaultwarden/data
+name: vaultwarden
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:1.37.4
+    container_name: vaultwarden
+    restart: unless-stopped
+
+    # 공식 이미지는 PUID/PGID를 지원하지 않으므로 user로 실행 계정을 지정한다. (choimory:homeserver)
+    user: "1000:1500"
+
+    # HTTP로만 동작하므로 LAN에 열지 않고 localhost에만 바인딩한다. HTTPS는 tailscale serve가 담당한다.
+    ports:
+      - "127.0.0.1:8080:80"
+
+    # 비밀번호 DB, 첨부파일, RSA 키가 저장된다. 백업 1순위.
+    volumes:
+      - /data/apps/vaultwarden/data:/data
+
+    environment:
+      TZ: Asia/Seoul
+      # tailscale serve 주소와 포트까지 정확히 일치해야 웹 볼트, 첨부파일 링크, 패스키가 정상 동작한다.
+      DOMAIN: ${DOMAIN}
+      SIGNUPS_ALLOWED: ${SIGNUPS_ALLOWED}
+      # /admin 관리 페이지 토큰. 평문이 아닌 argon2 해시를 넣는다.
+      ADMIN_TOKEN: ${ADMIN_TOKEN}
