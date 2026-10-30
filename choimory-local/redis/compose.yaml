@@ -1,0 +1,24 @@
+# Redis: 로컬 개발용 캐시 (맥북, Docker Desktop)
+#
+# 기존 docker run 컨테이너에서 이전하는 방법
+#   기존 데이터는 익명 볼륨에 있었고 버리기로 했으므로 데이터 이전 없이 새로 시작한다.
+#   1. docker stop redis_choimory && docker rm -v redis_choimory  (-v: 익명 볼륨도 함께 삭제)
+#   2. docker compose up -d
+name: local-redis
+
+services:
+  redis:
+    image: redis:8.10.3
+    container_name: redis_choimory
+    restart: always
+
+    # 비밀번호를 걸지 않는 대신 localhost에만 바인딩해 외부 접근을 막는다.
+    ports:
+      - "127.0.0.1:6379:6379"
+
+    # 기본 RDB 스냅샷이 저장되는 위치. 익명 볼륨 대신 bind mount로 데이터 위치를 고정한다.
+    volumes:
+      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/redis:/data
+
+    environment:
+      TZ: Asia/Seoul

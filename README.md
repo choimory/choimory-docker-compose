@@ -8,7 +8,12 @@
 
 ```txt
 choimory-docker-compose/
-├── choimory-dev/          # (미작성)
+├── choimory-dev/          # 개인프로젝트 choimory-dev 로컬 구동용 compose (미작성)
+├── choimory-local/        # 맥북 로컬 개발용 DB compose
+│   ├── postgres/          # compose.yaml, .env.example
+│   ├── redis/
+│   ├── elasticsearch/
+│   └── mysql/
 └── choimory-server/       # 홈서버 미니PC의 개인용 앱 compose
     ├── dockge/            # compose.yaml, .env.example
     ├── homepage/
@@ -123,3 +128,45 @@ choimory-docker-compose/
 - 현재 미적용. 서버와 향후 연결할 DAS 외에 다른 저장소가 없어서 보류함
 - DAS를 연결할 때 Kopia를 다시 검토함. 저장소를 DAS에 두고 `/data/apps`와 DB 덤프를 백업하는 방식
 - 그 전까지 Vaultwarden 볼트는 Bitwarden 앱의 내보내기로 수동 보관함
+
+---
+
+# choimory-local
+
+## 개요
+
+- 로컬 개발할 때 쓰는 개인 어플리케이션 모음
+- 필요한 것만 골라 띄울 수 있도록 서비스별 디렉토리로 분리하며, 각 디렉토리에서 `docker compose up -d`로 기동
+- 서비스 간 네트워크는 공유하지 않음. 앱과 DataGrip은 `localhost:포트`로 접속
+
+## 서비스 목록
+
+| 서비스 | 이미지 | 호스트 바인딩 | container_name | 데이터 경로 |
+| --- | --- | --- | --- | --- |
+| PostgreSQL | `postgres:16.15` | 127.0.0.1:5432 | postgres_choimory | `docker_volume/postgres` |
+| Redis | `redis:8.10.3` | 127.0.0.1:6379 | redis_choimory | `docker_volume/redis` |
+| Elasticsearch | `elasticsearch:8.19.23` | 127.0.0.1:9200 | elasticsearch_choimory | `docker_volume/elasticsearch` |
+| MySQL | `mysql:8.4.13` | 127.0.0.1:3306 | mysql_choimory | `docker_volume/mysql` |
+
+- 데이터 경로 기준: `${HOME}/choimory_workspace/DataGripProjects/docker_volume/`
+
+## compose 작성 규칙
+
+- 서비스 하나에 디렉토리 하나, 파일명은 `compose.yaml`
+- 프로젝트명은 `local-<서비스>` (`name: local-postgres`)로 다른 compose 프로젝트와 겹치지 않게 함
+- 상시 기동이 필요하므로 `restart: always`
+- 포트는 기본 포트를 쓰되 `127.0.0.1`에만 바인딩함 (공용 와이파이에서 외부 접근 차단)
+- 데이터는 bind mount로 `docker_volume/<서비스>`에 저장함. compose는 `~`를 펼치지 못하므로 `${HOME}` 사용
+- 이미지 태그는 버전까지 고정함
+- 비밀번호는 `.env.example`에 `# 사용 시 변경` 주석과 자리표시자로 두고, 사용 시 `.env`로 복사해 수정함. `.env`는 gitignore 대상
+
+## 서비스별 참고
+
+- **PostgreSQL**: 메이저 버전 16 유지. 17 이상으로 올리려면 dump/restore 필요. `POSTGRES_USER`, `POSTGRES_PASSWORD`는 데이터 디렉토리가 비어 있을 때만 적용
+- **Redis**: 비밀번호 없음 (localhost 전용). 기본 RDB 스냅샷을 `/data`에 저장
+- **Elasticsearch**
+  - 단일 노드. 9300(노드 간 통신)은 열지 않음
+  - 보안 모드를 켜고 TLS는 끔. 클라이언트는 `elastic` 계정으로 인증 (`curl -u elastic:<비밀번호> localhost:9200`)
+  - `ELASTIC_PASSWORD`는 계정 정보가 없을 때(최초 기동) `elastic` 비밀번호로 설정됨
+  - 힙은 `.env`의 `ES_HEAP`(기본 `1g`)으로 고정. 지정하지 않으면 Docker Desktop VM 메모리의 절반을 힙으로 잡음
+- **MySQL**: 8 계열 LTS인 8.4 사용. 기본 인증은 `caching_sha2_password`이며 `mysql_native_password`는 기본 비활성
