@@ -160,10 +160,24 @@ choimory-docker-compose/
 - 이미지 태그는 버전까지 고정함
 - 비밀번호는 `.env.example`에 `# 사용 시 변경` 주석과 자리표시자로 두고, 사용 시 `.env`로 복사해 수정함. `.env`는 gitignore 대상
 
+## 실행 방법
+
+1. 서비스 디렉토리로 이동 (`cd choimory-local/<서비스>`)
+2. `.env.example`을 복사해 `.env` 작성 (`cp .env.example .env` 후 `changeme`를 실제 값으로 변경)
+3. `docker compose config`로 확인 후 `docker compose up -d`
+4. 상태 확인
+   - 로그: `docker compose logs -f`
+   - Postgres, MySQL: DataGrip으로 `localhost:<포트>` 접속
+   - Elasticsearch: `curl -u elastic:<비밀번호> localhost:9200`
+   - Redis: `docker exec -it redis_choimory redis-cli --user <계정> --pass <비밀번호> --no-auth-warning ping` (`PONG`)
+5. 중지: `docker compose down` (데이터는 bind mount 경로에 남음)
+
+- bind mount 경로에 기존 데이터가 있으면 Postgres, MySQL은 초기화하지 않고 기존 데이터를 씀. 이때 `.env`의 계정, 비밀번호 값은 적용되지 않음
+
 ## 서비스별 참고
 
 - **PostgreSQL**: 메이저 버전 16 유지. 17 이상으로 올리려면 dump/restore 필요. `POSTGRES_USER`, `POSTGRES_PASSWORD`는 데이터 디렉토리가 비어 있을 때만 적용
-- **Redis**: 비밀번호 없음 (localhost 전용). 기본 RDB 스냅샷을 `/data`에 저장
+- **Redis**: ACL로 `REDIS_USER` 계정 인증을 걸고 `default` 계정은 끔. 앱에는 username, password를 둘 다 설정. 기본 RDB 스냅샷을 `/data`에 저장
 - **Elasticsearch**
   - 단일 노드. 9300(노드 간 통신)은 열지 않음
   - 보안 모드를 켜고 TLS는 끔. 클라이언트는 `elastic` 계정으로 인증 (`curl -u elastic:<비밀번호> localhost:9200`)
