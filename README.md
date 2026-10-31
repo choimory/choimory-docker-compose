@@ -29,7 +29,9 @@
 
 ```txt
 choimory-docker-compose/
-├── choimory-dev/          # 개인프로젝트 choimory-dev 로컬 구동용 compose (미작성)
+├── choimory-dev/          # 개인프로젝트 choimory-dev 로컬 구동용 compose
+│   ├── compose.yaml       # postgres, redis, member-api, front (profiles로 골라 띄움)
+│   └── .env.example
 ├── choimory-local/        # 맥북 로컬 개발용 DB compose
 │   ├── postgres/          # compose.yaml, .env.example
 │   ├── redis/
@@ -166,12 +168,13 @@ choimory-docker-compose/
 
 | 서비스 | 이미지 | 호스트 바인딩 | container_name | 데이터 경로 |
 | --- | --- | --- | --- | --- |
-| PostgreSQL | `postgres:16.15-bookworm` | 127.0.0.1:5432 | postgres_choimory | `docker_volume/postgres` |
-| Redis | `redis:8.10.3` | 127.0.0.1:6379 | redis_choimory | `docker_volume/redis` |
-| Elasticsearch | `elasticsearch:8.19.23` | 127.0.0.1:9200 | elasticsearch_choimory | `docker_volume/elasticsearch` |
-| MySQL | `mysql:8.4.13` | 127.0.0.1:3306 | mysql_choimory | `docker_volume/mysql` |
+| PostgreSQL | `postgres:16.15-bookworm` | 127.0.0.1:5432 | postgres_choimory | `docker_volume/choimory/postgres` |
+| Redis | `redis:8.10.3` | 127.0.0.1:6379 | redis_choimory | `docker_volume/choimory/redis` |
+| Elasticsearch | `elasticsearch:8.19.23` | 127.0.0.1:9200 | elasticsearch_choimory | `docker_volume/choimory/elasticsearch` |
+| MySQL | `mysql:8.4.13` | 127.0.0.1:3306 | mysql_choimory | `docker_volume/choimory/mysql` |
 
 - 데이터 경로 기준: `${HOME}/choimory_workspace/DataGripProjects/docker_volume/`
+  - `choimory/`는 choimory-local(개인용), `choimory-dev/`는 choimory-dev 프로젝트용으로 구분함
 
 ## compose 작성 규칙
 
@@ -179,7 +182,7 @@ choimory-docker-compose/
 - 프로젝트명은 `local-<서비스>` (`name: local-postgres`)로 다른 compose 프로젝트와 겹치지 않게 함
 - 상시 기동이 필요하므로 `restart: always`
 - 포트는 기본 포트를 쓰되 `127.0.0.1`에만 바인딩함 (공용 와이파이에서 외부 접근 차단)
-- 데이터는 bind mount로 `docker_volume/<서비스>`에 저장함. compose는 `~`를 펼치지 못하므로 `${HOME}` 사용
+- 데이터는 bind mount로 `docker_volume/choimory/<서비스>`에 저장함. compose는 `~`를 펼치지 못하므로 `${HOME}` 사용
 - 이미지 태그는 버전까지 고정함
 - 비밀번호는 `.env.example`에 `# 사용 시 변경` 주석과 자리표시자로 두고, 사용 시 `.env`로 복사해 수정함. `.env`는 gitignore 대상
 
@@ -207,3 +210,130 @@ choimory-docker-compose/
   - `ELASTIC_PASSWORD`는 계정 정보가 없을 때(최초 기동) `elastic` 비밀번호로 설정됨
   - 힙은 `.env`의 `ES_HEAP`(기본 `1g`)으로 고정. 지정하지 않으면 Docker Desktop VM 메모리의 절반을 힙으로 잡음
 - **MySQL**: 8 계열 LTS인 8.4 사용. 기본 인증은 `caching_sha2_password`이며 `mysql_native_password`는 기본 비활성
+
+---
+
+# choimory-dev
+
+## 개요
+
+- 개인프로젝트 choimory-dev(`~/choimory_workspace/IdeaProjects/choimory-dev`)를 로컬에서 컨테이너로 띄우기 위한 compose
+- 대상: `choimory-dev-member-api`(Spring Boot), `choimory-dev-front`(Next.js). `choimory-dev-sender-queue`는 미개발이라 제외
+- 앱 이미지는 각 앱 레포의 `Dockerfile`로 빌드함. compose의 `build.context`는 `.env`의 `MEMBER_API_CONTEXT`, `FRONT_CONTEXT`(기본 `../../../choimory-dev/<레포>`, compose.yaml 위치 기준)로 지정함
+  - compose에 기본값이 없는 필수 변수(`:?`)라, `.env`에 값이 없으면 모든 compose 명령이 "`.env`에 설정하라"는 메시지와 함께 멈춤
+  - 경로는 이미지를 빌드할 때만 필요함. 이미지가 남아 있거나 `db-only`로 띄울 때는 레포가 없어도 됨
+- 개발할 때만 띄우는 용도라 `restart` 정책 없음. 끌 때 컨테이너를 지우고, 앱 이미지는 남겨 다음 기동에 재사용
+- IDE로 개발 중인 서비스는 빼고 나머지만 컨테이너로 띄울 수 있도록 profiles와 `--scale`로 구성함
+- 상세 사용법은 `choimory-dev/README.md` 참고
+
+## 서비스 목록
+
+| 서비스 | 이미지 | 호스트 바인딩 | container_name | profiles | 비고 |
+| --- | --- | --- | --- | --- | --- |
+| postgres | `postgres:16.15-bookworm` | 127.0.0.1:15432 | postgres_choimory-dev | `all`, `db-only`, `back-only` | database `choimory_dev_member` |
+| redis | `redis:8.10.3` | 127.0.0.1:16379 | redis_choimory-dev | `all`, `db-only`, `back-only` | ACL 계정 인증 |
+| member-api | 앱 레포 Dockerfile 빌드 | 127.0.0.1:8080 | member-api_choimory-dev | `all`, `back-only` | Spring 프로필 `local` |
+| front | 앱 레포 Dockerfile 빌드 | 127.0.0.1:3000 | front_choimory-dev | `all`, `front-only` | |
+
+- 데이터 경로: `${HOME}/choimory_workspace/DataGripProjects/docker_volume/choimory-dev/{postgres,redis}`
+- postgres, redis는 choimory-local(5432, 6379)과 겹치지 않도록 호스트 포트를 15432, 16379로 씀
+
+## 구성
+
+- compose 파일 하나(`choimory-dev/compose.yaml`)에 모든 서비스를 두고, 모든 서비스에 profile을 닮
+  - profile이 없는 서비스는 어떤 profile을 줘도 항상 뜨므로, `db-only`처럼 일부만 띄우려면 모든 서비스에 profile이 필요함
+  - `.env`의 `COMPOSE_PROFILES=all`을 기본값으로 둬서, profile 미지정 `up`/`down`이 전체를 대상으로 함
+- 특정 서비스 빼기는 profile 대신 `--scale <서비스>=0` 사용. 빼는 profile을 만들면 모든 서비스에 그 이름을 달아야 해서 조합이 늘어나기 때문
+- 프로젝트명은 `name: choimory-dev`, `container_name`은 `<서비스>_choimory-dev` (choimory-local의 `_choimory`와 구분)
+- member-api
+  - DB, Redis에는 compose 기본 네트워크의 서비스 이름(`postgres`, `redis`)으로 접속
+  - `application-*.yml`의 자리표시자(`${rdb-host}` 등)를 대문자+언더스코어 환경변수(`RDB_HOST` 등)로 주입함. Spring이 relaxed binding으로 찾음
+  - postgres, redis의 healthcheck가 통과한 뒤 기동함. 기동 시 Flyway가 테이블과 초기 데이터를 만듦
+  - database는 Flyway가 아닌 postgres 이미지가 `POSTGRES_DB`로 최초 기동 때 만듦
+- front
+  - 서버(Route Handler)는 `MEMBER_API_BASE_URL=http://host.docker.internal:8080`(실행 시 환경변수)으로 호출. 호스트의 8080을 거치므로 member-api가 컨테이너든 IDE든 같은 주소로 닿음
+  - 브라우저는 `NEXT_PUBLIC_MEMBER_API_BASE_URL=http://localhost:8080`(빌드 인자, 번들에 고정)으로 호출
+  - `depends_on: member-api`는 `required: false`. member-api 컨테이너 없이 front를 띄우는 경우(`front-only`, `--scale member-api=0`)가 있기 때문
+  - member-api의 CORS(local 프로필)가 `http://localhost:3000`을 허용하므로 3000 포트를 유지함
+- `member-api`, `front`에는 `image:` 이름을 붙이지 않음. `down --rmi local`이 이름 없는 빌드 이미지만 지우기 때문
+
+## 앱 레포의 Docker 파일
+
+| 레포 | 파일 | 내용 |
+| --- | --- | --- |
+| choimory-dev-member-api | `Dockerfile` | `eclipse-temurin:21-jdk`에서 gradlew로 `:member-api:bootJar` → `eclipse-temurin:21-jre`로 실행. Gradle 의존성은 BuildKit 캐시 마운트로 재사용 |
+| choimory-dev-member-api | `.dockerignore` | 빌드 결과물, IDE, 문서 제외 (`docs/flyway`는 포함) |
+| choimory-dev-front | `Dockerfile` | `node:22-alpine`에서 의존성 설치, 빌드 → standalone 결과물만 실행 |
+| choimory-dev-front | `.dockerignore` | `node_modules`, `.next`, `env/`, `.env*` 등 제외 |
+| choimory-dev-front | `next.config.ts` | `output: "standalone"` |
+
+- 이미지 태그는 패치 버전까지 고정함 (`eclipse-temurin:21.0.13_9-*-noble`, `node:22.23.4-alpine`)
+
+## profiles
+
+| profile | 포함 서비스 | 용도 |
+| --- | --- | --- |
+| `all` (기본) | postgres, redis, member-api, front | 전체 |
+| `db-only` | postgres, redis | 백엔드를 IDE로 개발할 때 |
+| `back-only` | postgres, redis, member-api | 프론트를 IDE로 개발할 때 |
+| `front-only` | front | 백엔드 전부를 IDE로 돌리면서 프론트만 컨테이너로 띄울 때. DB는 `db-only`로 따로 띄움 |
+
+- `--profile`은 `up`뿐 아니라 `down`, `ps`, `logs`, `build` 등 모든 compose 명령에 적용되는 필터. 여러 개를 주면 합친 서비스가 대상
+- 명령의 `--profile`이 `.env`의 `COMPOSE_PROFILES`보다 우선함
+- 새 백엔드(예: sender-queue)는 `all`, `back-only`를 달아 추가함
+
+## 실행 방법
+
+1. `cd choimory-dev`
+2. `cp .env.example .env` 후 `changeme`를 실제 값으로 변경. `JWT_SECRET`은 32바이트 이상 (`openssl rand -base64 48`)
+3. 개발 패턴에 맞게 기동
+
+| 개발 패턴 | 명령 | 뜨는 것 |
+| --- | --- | --- |
+| 전체를 컨테이너로 확인 | `docker compose up -d` | 전부 |
+| 백엔드를 IDE로 개발 | `docker compose --profile db-only up -d` | postgres, redis |
+| 프론트를 IDE로 개발, 프론트 개발 확인 | `docker compose --profile back-only up -d` | postgres, redis, member-api |
+| 백엔드 전부 IDE + 프론트는 컨테이너 | `docker compose --profile db-only --profile front-only up -d` | postgres, redis, front |
+| 특정 백엔드만 IDE, 나머지는 컨테이너 | `docker compose up -d --scale member-api=0` | member-api만 빼고 전부 |
+| 종료 (모든 경우) | `docker compose down` | - |
+
+```bash
+# 특정 서비스 빼기: 여러 개는 이어 쓰고, profile과 같이 쓸 수도 있음
+docker compose up -d --scale member-api=0 --scale front=0
+docker compose --profile back-only up -d --scale member-api=0
+
+# 앱 코드가 바뀌어 이미지를 새로 빌드할 때 (어느 패턴 명령에나 붙임)
+docker compose up -d --build
+
+# 직접 빌드한 앱 이미지까지 지우고 싶을 때
+docker compose down --rmi local
+```
+
+| 옵션 | 언제 쓰나 | 동작 |
+| --- | --- | --- |
+| `up --scale <서비스>=0` | 해당 서비스를 IDE로 돌릴 때 | 그 서비스 컨테이너만 빼고 기동. 이미 떠 있으면 내림 |
+| `up --build` | 앱 코드(member-api, front)가 바뀌었을 때 | 이미지를 다시 빌드해 같은 태그(`latest`)로 덮어쓰고, 바뀐 컨테이너만 교체. 바뀐 게 없으면 캐시로 몇 초 안에 끝남 |
+| `down --rmi local` | 앱 이미지까지 지워 디스크를 비우고 싶을 때 | `image:` 이름 없이 직접 빌드한 이미지(member-api, front)만 삭제. postgres, redis 이미지는 유지 |
+
+- `--build` 없이 `up`하면 남아 있는 앱 이미지를 그대로 씀. 코드를 고친 뒤 `--build`를 빼면 **예전 코드로 뜸**
+- `--build`로 덮어쓰면 이전 이미지는 태그 없는(`<none>`) 이미지로 남음. 쌓이면 가끔 `docker image prune`으로 정리. 빌드 캐시는 `docker builder prune`
+- IDE의 front와 컨테이너 front(3000), IDE의 member-api와 컨테이너 member-api(8080)는 포트가 같아 동시에 띄우지 않음
+- IDE로 member-api를 띄울 때는 DB `localhost:15432`, Redis `localhost:16379`로 설정 (choimory-local의 5432, 6379가 아님)
+- DB 접속(DataGrip): `localhost:15432`, database `choimory_dev_member`, 계정은 `.env`의 `POSTGRES_USER`
+- DB를 초기화하려면 down 후 `docker_volume/choimory-dev/postgres` 디렉토리를 삭제하고 다시 기동 (Flyway가 다시 적용됨)
+
+## 환경변수 (.env)
+
+| 변수 | 기본값(.env.example) | 설명 |
+| --- | --- | --- |
+| `COMPOSE_PROFILES` | `all` | profile 미지정 시 적용할 기본 profile. 지우면 profile 없는 `up`/`down`이 아무 서비스도 대상으로 삼지 않음 |
+| `POSTGRES_USER` | `choimory` | postgres 계정. member-api의 `RDB_USER`로도 쓰임 |
+| `POSTGRES_PASSWORD` | `changeme` | 위 계정 비밀번호 |
+| `POSTGRES_DB` | `choimory_dev_member` | member-api용 database |
+| `REDIS_USER` | `choimory` | redis ACL 계정 |
+| `REDIS_PASSWORD` | `changeme` | 위 계정 비밀번호. `$`는 쓰지 않음 |
+| `JWT_SECRET` | `changeme` | member-api JWT 서명 키 (HS256, 32바이트 이상) |
+| `MEMBER_API_CONTEXT` | `../../../choimory-dev/choimory-dev-member-api` | member-api 레포 위치 (`build.context`). 필수 값 |
+| `FRONT_CONTEXT` | `../../../choimory-dev/choimory-dev-front` | front 레포 위치 (`build.context`). 필수 값 |
+
+- postgres 계정과 database는 데이터 디렉토리가 비어 있을 때(최초 기동)만 적용됨
