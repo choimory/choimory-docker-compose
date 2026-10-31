@@ -1,12 +1,4 @@
 # PostgreSQL: 로컬 개발용 DB (맥북, Docker Desktop)
-#
-# 기존 docker run 컨테이너에서 이전하는 방법
-#   1. docker stop postgres_choimory
-#   2. 기존 데이터를 새 경로로 복사한다. (이동이 아닌 복사. 정상 기동 확인 후 기존 디렉토리 삭제)
-#      mkdir -p ~/choimory_workspace/DataGripProjects/docker_volume
-#      cp -Rp ~/DataGripProjects/DockerMount/postgres/data ~/choimory_workspace/DataGripProjects/docker_volume/postgres
-#   3. docker rm postgres_choimory  (container_name이 같아 지우지 않으면 충돌)
-#   4. cp .env.example .env 후 값 수정, docker compose up -d
 name: local-postgres
 
 services:
@@ -23,7 +15,7 @@ services:
       - "127.0.0.1:5432:5432"
 
     volumes:
-      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/postgres:/var/lib/postgresql/data
+      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/choimory/postgres:/var/lib/postgresql/data
 
     # POSTGRES_USER, POSTGRES_PASSWORD는 데이터 디렉토리가 비어 있을 때(최초 초기화)만 적용된다.
     # 기존 데이터를 옮겨온 경우에는 기존 계정과 비밀번호가 그대로 유지된다.

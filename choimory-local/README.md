@@ -68,10 +68,12 @@ choimory-local/
 
 ```txt
 ~/choimory_workspace/DataGripProjects/docker_volume/
-├── postgres/
-├── redis/
-├── elasticsearch/
-└── mysql/
+├── choimory/          # choimory-local (개인용)
+│   ├── postgres/
+│   ├── redis/
+│   ├── elasticsearch/
+│   └── mysql/
+└── choimory-dev/      # choimory-dev 프로젝트용 (../choimory-dev 참고)
 ```
 
 - 경로가 없으면 Docker Desktop이 자동으로 만듦
@@ -92,7 +94,6 @@ choimory-local/
 - 이미지 태그는 패치 버전까지 고정함. `latest`는 쓰지 않음
 - `TZ: Asia/Seoul`
 - 비밀번호는 `.env.example`에 `# 사용 시 변경` 주석과 `changeme` 자리표시자로 두고, 사용 시 `.env`로 복사해 수정함
-- compose 상단 주석에 서비스 용도와 기존 컨테이너에서 이전하는 방법을 적음
 
 ---
 

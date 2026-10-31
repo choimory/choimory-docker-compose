@@ -19,7 +19,7 @@ services:
       - "127.0.0.1:3306:3306"
 
     volumes:
-      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/mysql:/var/lib/mysql
+      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/choimory/mysql:/var/lib/mysql
 
     # 아래 계정 값은 데이터 디렉토리가 비어 있을 때(최초 초기화)만 적용된다.
     environment:

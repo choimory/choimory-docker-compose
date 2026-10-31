@@ -1,14 +1,4 @@
 # Elasticsearch: 로컬 개발용 검색엔진 (맥북, Docker Desktop, 단일 노드)
-#
-# 기존 docker run 컨테이너(8.12.2)에서 이전하는 방법
-#   8.19로 한 번 기동하면 데이터가 변환되어 8.12로 되돌릴 수 없으므로, 반드시 이동이 아닌 복사로 이전한다.
-#   1. docker stop elasticsearch_choimory
-#   2. mkdir -p ~/choimory_workspace/DataGripProjects/docker_volume
-#      cp -Rp ~/DataGripProjects/DockerMount/elasticsearch/data ~/choimory_workspace/DataGripProjects/docker_volume/elasticsearch
-#   3. docker rm elasticsearch_choimory  (container_name이 같아 지우지 않으면 충돌)
-#   4. cp .env.example .env 후 값 수정, docker compose up -d
-#   5. curl -u elastic:<비밀번호> localhost:9200 으로 확인 후 기존 디렉토리 삭제
-#
 # 보안 모드를 켰으므로 클라이언트(Spring, curl 등)는 elastic 계정으로 인증해야 한다.
 name: local-elasticsearch
 
@@ -23,7 +13,7 @@ services:
       - "127.0.0.1:9200:9200"
 
     volumes:
-      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/elasticsearch:/usr/share/elasticsearch/data
+      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/choimory/elasticsearch:/usr/share/elasticsearch/data
 
     environment:
       discovery.type: single-node
