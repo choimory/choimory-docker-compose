@@ -1,0 +1,32 @@
+# Dockge: choimory-server의 Docker Compose 스택 웹 관리 도구
+# 이 저장소의 choimory-server/ 디렉토리를 stacks 경로로 사용해, 앱별 compose.yaml을 웹에서 기동/중지/수정한다.
+#
+# 접속: Tailscale 전용 관리 화면
+#   sudo tailscale serve --bg --https=5001 http://127.0.0.1:5001
+#   → https://choimory-server.<tailnet>.ts.net:5001
+#
+# 사전 준비
+#   mkdir -p /data/apps/dockge/data
+name: dockge
+
+services:
+  dockge:
+    image: louislam/dockge:1.5.0
+    container_name: dockge
+    restart: unless-stopped
+
+    # 관리 화면이라 LAN에 열지 않고 localhost에만 바인딩한다. 외부 접근은 tailscale serve로만 한다.
+    ports:
+      - "127.0.0.1:5001:5001"
+
+    volumes:
+      # Docker 데몬 제어용 소켓. 사실상 root 권한이므로 Dockge 화면 접근은 반드시 Tailscale로 제한한다.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /data/apps/dockge/data:/app/data
+      # Dockge는 compose 파일 경로를 호스트에 그대로 전달하므로, 컨테이너 내부 경로와 호스트 경로가 같아야 한다.
+      # Dockge 화면에서 compose를 수정하면 저장소 파일이 바로 바뀌므로 git status로 변경사항을 확인한다.
+      - ${STACKS_DIR}:${STACKS_DIR}
+
+    environment:
+      DOCKGE_STACKS_DIR: ${STACKS_DIR}
+      TZ: Asia/Seoul

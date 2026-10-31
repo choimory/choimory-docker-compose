@@ -1,0 +1,81 @@
+# Immich: 아이폰 사진 자동 백업 (구글 포토 대체)
+# 공식 릴리스(v3.3.5)의 docker-compose.yml을 기준으로 경로와 재시작 정책만 홈서버 규칙에 맞게 바꿨다.
+# 버전을 올릴 때는 해당 릴리스의 docker-compose.yml과 비교해 redis/database 이미지 변경 여부를 확인한다.
+#   https://github.com/immich-app/immich/releases/latest/download/docker-compose.yml
+#
+# 접속: LAN, Tailscale (http://<서버 IP>:2283), 계정은 Immich 앱 안에서 관리
+#
+# 사전 준비
+#   mkdir -p /data/apps/immich/{postgres,model-cache}
+name: immich
+
+services:
+  # API 서버 + 웹 화면. 업로드된 사진은 UPLOAD_LOCATION(/data/nas/photos)에 저장된다.
+  immich-server:
+    container_name: immich_server
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION}
+
+    # 동영상 하드웨어 트랜스코딩(VA-API)이 필요해지면 주석을 해제하고,
+    # Immich 관리 화면 > 동영상 트랜스코딩 > 하드웨어 가속을 VAAPI로 지정한다.
+    # devices:
+    #   - /dev/dri:/dev/dri
+
+    # 공식 이미지는 컨테이너 내부 root로 실행되므로 사진 파일은 root 소유로 생성된다. (다른 계정에서 읽기는 가능)
+    volumes:
+      - ${UPLOAD_LOCATION}:/data
+      - /etc/localtime:/etc/localtime:ro
+
+    env_file:
+      - .env
+
+    # 아이폰 앱이 LAN과 Tailscale 양쪽에서 업로드해야 하므로 전체 인터페이스에 바인딩한다.
+    ports:
+      - "2283:2283"
+
+    depends_on:
+      - redis
+      - database
+    restart: unless-stopped
+    healthcheck:
+      disable: false
+
+  # 얼굴 인식, 스마트 검색용 머신러닝 서버
+  # AMD GPU 가속(ROCm)은 이미지가 크고 실험적이라 쓰지 않고 CPU로 실행한다. (Ryzen 7 7735HS로 충분)
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION}
+    volumes:
+      # 다운로드한 ML 모델 캐시. 지워도 다시 받으므로 백업 대상은 아니다.
+      - /data/apps/immich/model-cache:/cache
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      disable: false
+
+  # Immich 전용 Redis(Valkey). 외부에 포트를 노출하지 않는다.
+  # 이미지 digest는 공식 compose 값을 그대로 쓴다. 임의로 바꾸지 않는다.
+  redis:
+    container_name: immich_redis
+    image: docker.io/valkey/valkey:9@sha256:c123e3715db63d06d4ad6964884037aa0d5d4d703939b9929954112889708e1d
+    healthcheck:
+      test: redis-cli ping | grep -q PONG || exit 1
+    restart: unless-stopped
+
+  # Immich 전용 PostgreSQL(벡터 검색 확장 포함). 외부에 포트를 노출하지 않는다.
+  # 이미지 digest는 공식 compose 값을 그대로 쓴다. 다른 postgres 이미지로 바꾸면 Immich가 기동하지 않는다.
+  database:
+    container_name: immich_postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      # DB 데이터는 백업 1순위. 파일 복사가 아니라 pg_dump로 백업한다.
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
+    restart: unless-stopped
+    healthcheck:
+      disable: false

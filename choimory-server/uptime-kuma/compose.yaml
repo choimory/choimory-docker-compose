@@ -1,0 +1,27 @@
+# Uptime Kuma: choimory-server 서비스 다운 감시 및 알림
+# AdGuard Home은 HTTP가 아닌 DNS 모니터 타입으로 <Tailscale IP>:53을 감시해야 실제 DNS 응답 여부를 확인할 수 있다.
+#
+# 접속: Tailscale 전용 관리 화면
+#   sudo tailscale serve --bg --https=3001 http://127.0.0.1:3001
+#   → https://choimory-server.<tailnet>.ts.net:3001
+#
+# 사전 준비
+#   mkdir -p /data/apps/uptime-kuma/data
+name: uptime-kuma
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:2.5.8
+    container_name: uptime-kuma
+    restart: unless-stopped
+
+    # 관리 화면이라 localhost에만 바인딩한다. 외부 접근은 tailscale serve로만 한다.
+    ports:
+      - "127.0.0.1:3001:3001"
+
+    # 기본 이미지는 컨테이너 내부 root로 실행되므로 data 디렉토리 파일은 root 소유로 생성된다.
+    volumes:
+      - /data/apps/uptime-kuma/data:/app/data
+
+    environment:
+      TZ: Asia/Seoul

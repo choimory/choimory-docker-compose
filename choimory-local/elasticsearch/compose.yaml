@@ -1,0 +1,28 @@
+# Elasticsearch: 로컬 개발용 검색엔진 (맥북, Docker Desktop, 단일 노드)
+# 보안 모드를 켰으므로 클라이언트(Spring, curl 등)는 elastic 계정으로 인증해야 한다.
+name: local-elasticsearch
+
+services:
+  elasticsearch:
+    image: elasticsearch:8.19.23
+    container_name: elasticsearch_choimory
+    restart: always
+
+    # 9300(노드 간 통신)은 단일 노드라 쓰지 않으므로 9200(HTTP API)만 localhost에 연다.
+    ports:
+      - "127.0.0.1:9200:9200"
+
+    volumes:
+      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/choimory/elasticsearch:/usr/share/elasticsearch/data
+
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      # 로컬 단일 노드라 HTTPS, 노드 간 TLS는 쓰지 않는다. 인증만 적용한다.
+      xpack.security.http.ssl.enabled: "false"
+      xpack.security.transport.ssl.enabled: "false"
+      # 계정 정보가 없을 때(최초 기동) elastic 계정 비밀번호로 설정된다.
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      # 지정하지 않으면 Docker Desktop VM 메모리의 절반을 힙으로 잡으므로 고정한다.
+      ES_JAVA_OPTS: -Xms${ES_HEAP:-1g} -Xmx${ES_HEAP:-1g}
+      TZ: Asia/Seoul

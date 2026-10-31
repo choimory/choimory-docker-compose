@@ -1,0 +1,25 @@
+# PostgreSQL: 로컬 개발용 DB (맥북, Docker Desktop)
+name: local-postgres
+
+services:
+  postgres:
+    # 기존 16.9 데이터를 그대로 쓰기 위해 메이저 버전 16을 유지한다. 17 이상으로 올리려면 dump/restore가 필요하다.
+    # 기존 이미지와 같은 Debian bookworm 기반으로 고정한다. 기본 태그(trixie)는 glibc가 달라
+    # 문자열 정렬 규칙(collation)이 바뀌어 기존 텍스트 인덱스가 어긋날 수 있다.
+    image: postgres:16.15-bookworm
+    container_name: postgres_choimory
+    restart: always
+
+    # 카페 등 공용 와이파이에서 다른 기기가 접근하지 못하도록 localhost에만 바인딩한다.
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/choimory/postgres:/var/lib/postgresql/data
+
+    # POSTGRES_USER, POSTGRES_PASSWORD는 데이터 디렉토리가 비어 있을 때(최초 초기화)만 적용된다.
+    # 기존 데이터를 옮겨온 경우에는 기존 계정과 비밀번호가 그대로 유지된다.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: Asia/Seoul

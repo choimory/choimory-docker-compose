@@ -1,0 +1,49 @@
+# AdGuard Home: 광고 차단 DNS
+# Tailscale DNS(전역 네임서버)에 서버 Tailscale IP를 등록하면 밖에서도 광고 차단이 적용된다.
+#
+# 접속: 관리 화면은 Tailscale 전용
+#   sudo tailscale serve --bg --https=3002 http://127.0.0.1:3002
+#   → https://choimory-server.<tailnet>.ts.net:3002
+#
+# 사전 준비
+#   1. 53번 포트를 점유하는 systemd-resolved 스텁 리스너 끄기
+#      서버 자신은 AdGuard가 아닌 외부 DNS를 쓴다. (AdGuard 장애 시에도 apt, docker pull, tailscale 복구 가능하도록)
+#        sudo mkdir -p /etc/systemd/resolved.conf.d
+#        printf "[Resolve]\nDNS=1.1.1.1 8.8.8.8\nDNSStubListener=no\n" | sudo tee /etc/systemd/resolved.conf.d/adguardhome.conf
+#        sudo mv /etc/resolv.conf /etc/resolv.conf.backup
+#        sudo ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
+#        sudo systemctl restart systemd-resolved
+#   2. 서버가 tailnet DNS(=자기 자신의 AdGuard)를 받지 않도록 설정
+#      이후 서버에서는 MagicDNS 이름이 풀리지 않으므로 다른 기기는 IP로 접근한다.
+#        sudo tailscale set --accept-dns=false
+#   3. mkdir -p /data/apps/adguard-home/{work,conf}
+#
+# 최초 설정 마법사
+#   - 관리 웹 인터페이스 포트는 3000 그대로 둔다. (아래 포트 매핑이 컨테이너 3000번 기준)
+#   - DNS 서버는 모든 인터페이스, 53번 포트로 둔다.
+#
+# 적용 순서
+#   맥북 한 대에서만 DNS로 써보고 안정되면 Tailscale DNS에 등록한다.
+#   Tailscale에는 보조 DNS(1.1.1.1)도 함께 등록한다. 광고 차단이 일부 새는 대신 AdGuard 장애 시에도 인터넷이 유지된다.
+name: adguard-home
+
+services:
+  adguard-home:
+    image: adguard/adguardhome:v0.107.79
+    container_name: adguard-home
+    restart: unless-stopped
+
+    ports:
+      # 클라이언트 DNS 질의. LAN과 Tailscale 기기 모두 쓰므로 전체 인터페이스에 바인딩한다.
+      - "53:53/tcp"
+      - "53:53/udp"
+      # 관리 화면. localhost에만 바인딩하고 외부 접근은 tailscale serve로만 한다.
+      - "127.0.0.1:3002:3000/tcp"
+
+    # 컨테이너 내부 root로 실행된다.
+    volumes:
+      - /data/apps/adguard-home/work:/opt/adguardhome/work
+      - /data/apps/adguard-home/conf:/opt/adguardhome/conf
+
+    environment:
+      TZ: Asia/Seoul

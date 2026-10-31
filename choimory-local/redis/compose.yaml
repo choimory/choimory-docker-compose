@@ -1,0 +1,35 @@
+# Redis: 로컬 개발용 캐시 (맥북, Docker Desktop)
+name: local-redis
+
+services:
+  redis:
+    image: redis:8.10.3
+    container_name: redis_choimory
+    restart: always
+
+    # ACL로 계정 인증을 건다.
+    #   default 계정: 비밀번호 없이 접속되는 기본 계정이라 끈다.
+    #   REDIS_USER 계정: 모든 키(~*), 채널(&*), 명령(+@all) 허용
+    command:
+      - redis-server
+      - --user
+      - default
+      - "off"
+      - --user
+      - ${REDIS_USER}
+      - "on"
+      - ">${REDIS_PASSWORD}"
+      - "~*"
+      - "&*"
+      - "+@all"
+
+    # 카페 등 공용 와이파이에서 다른 기기가 접근하지 못하도록 localhost에만 바인딩한다.
+    ports:
+      - "127.0.0.1:6379:6379"
+
+    # 기본 RDB 스냅샷이 저장되는 위치. 익명 볼륨 대신 bind mount로 데이터 위치를 고정한다.
+    volumes:
+      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/choimory/redis:/data
+
+    environment:
+      TZ: Asia/Seoul

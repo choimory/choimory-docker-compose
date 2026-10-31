@@ -1,0 +1,29 @@
+# MySQL: 로컬 개발용 DB (맥북, Docker Desktop)
+#
+# 신규 구성이라 이전할 데이터는 없다.
+#   cp .env.example .env 후 값 수정, docker compose up -d
+#
+# 8.4는 기본 인증이 caching_sha2_password이고 mysql_native_password는 기본 비활성이다.
+# 오래된 드라이버로 접속이 안 되면 드라이버 버전을 먼저 확인한다.
+name: local-mysql
+
+services:
+  mysql:
+    # 8.0은 2026년 4월 지원 종료. 현재 8 계열 LTS인 8.4를 사용한다.
+    image: mysql:8.4.13
+    container_name: mysql_choimory
+    restart: always
+
+    # 카페 등 공용 와이파이에서 다른 기기가 접근하지 못하도록 localhost에만 바인딩한다.
+    ports:
+      - "127.0.0.1:3306:3306"
+
+    volumes:
+      - ${HOME}/choimory_workspace/DataGripProjects/docker_volume/choimory/mysql:/var/lib/mysql
+
+    # 아래 계정 값은 데이터 디렉토리가 비어 있을 때(최초 초기화)만 적용된다.
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Seoul
