@@ -1,3 +1,35 @@
+# 목차
+
+- [개요](#개요)
+- [서버 사양](#서버-사양)
+- [디렉토리 구조](#디렉토리-구조)
+- [앱 목록과 포트](#앱-목록과-포트)
+- [네트워크 / 접근 규칙](#네트워크--접근-규칙)
+  - [바인딩 기준](#바인딩-기준)
+  - [tailscale serve 등록](#tailscale-serve-등록)
+  - [Jellyfin 외부 시청](#jellyfin-외부-시청)
+  - [AdGuard Home DNS 구성](#adguard-home-dns-구성)
+- [디렉토리 / 데이터 규칙](#디렉토리--데이터-규칙)
+  - [앱별 데이터 경로](#앱별-데이터-경로)
+- [compose 작성 규칙](#compose-작성-규칙)
+  - [실행 계정](#실행-계정)
+- [환경변수 (.env)](#환경변수-env)
+- [배포 방법](#배포-방법)
+  - [자주 쓰는 명령](#자주-쓰는-명령)
+- [앱별 참고](#앱별-참고)
+  - [Dockge](#dockge)
+  - [Homepage](#homepage)
+  - [Uptime Kuma](#uptime-kuma)
+  - [Jellyfin](#jellyfin)
+  - [Immich](#immich)
+  - [File Browser](#file-browser)
+  - [Vaultwarden](#vaultwarden)
+  - [AdGuard Home](#adguard-home)
+  - [Samba](#samba)
+- [백업](#백업)
+
+---
+
 # 개요
 
 - 개인 홈서버에 설치한 어플리케이션들의 compose 관리

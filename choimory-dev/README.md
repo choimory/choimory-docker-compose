@@ -1,3 +1,29 @@
+# 목차
+
+- [개요](#개요)
+- [디렉토리 구조](#디렉토리-구조)
+- [서비스 목록](#서비스-목록)
+  - [호스트 데이터 경로](#호스트-데이터-경로)
+- [실행 방법](#실행-방법)
+  - [처음 한 번](#처음-한-번)
+  - [개발 패턴별 명령](#개발-패턴별-명령)
+  - [특정 서비스만 빼기 (--scale)](#특정-서비스만-빼기---scale)
+  - [이미지 빌드, 정리 옵션](#이미지-빌드-정리-옵션)
+  - [IDE로 띄울 때 접속 주소](#ide로-띄울-때-접속-주소)
+  - [상태 확인](#상태-확인)
+- [profiles](#profiles)
+  - [설정한 profile](#설정한-profile)
+  - [모든 서비스에 profile을 단 이유와 COMPOSE_PROFILES](#모든-서비스에-profile을-단-이유와-compose_profiles)
+  - [profile과 --scale을 나눈 이유](#profile과---scale을-나눈-이유)
+- [down 옵션별 정리 범위](#down-옵션별-정리-범위)
+- [환경변수 (.env)](#환경변수-env)
+- [문제 해결](#문제-해결)
+  - [postgres 비밀번호를 바꿨는데 접속이 안 됨 (credential 오류)](#postgres-비밀번호를-바꿨는데-접속이-안-됨-credential-오류)
+  - [required variable MEMBER_API_CONTEXT is missing a value](#required-variable-member_api_context-is-missing-a-value)
+- [구성 메모](#구성-메모)
+
+---
+
 # 개요
 
 - 개인프로젝트 choimory-dev의 로컬 구동을 위한 compose 관리
@@ -53,8 +79,17 @@ choimory-dev/
 ## 처음 한 번
 
 ```bash
-cp .env.example .env   # changeme를 실제 값으로 변경. JWT_SECRET은 32바이트 이상 (openssl rand -base64 48)
+cp .env.example .env
 ```
+
+`.env`에서 아래 값을 확인, 수정함.
+
+| 변수 | 확인할 것 |
+| --- | --- |
+| `POSTGRES_PASSWORD`, `REDIS_PASSWORD` | `changeme`를 실제 값으로 변경. postgres는 최초 기동 전에 정해야 함 ([문제 해결](#문제-해결) 참고) |
+| `JWT_SECRET` | 32바이트 이상으로 변경 (`openssl rand -base64 48`) |
+| `COMPOSE_PROFILES` | profile 없이 실행할 때의 기본 모드. 기본 `all` |
+| `MEMBER_API_CONTEXT`, `FRONT_CONTEXT` | 앱 레포 위치. 기본은 `../../../choimory-dev/<레포>` |
 
 ## 개발 패턴별 명령
 
@@ -67,6 +102,7 @@ cp .env.example .env   # changeme를 실제 값으로 변경. JWT_SECRET은 32�
 | 특정 백엔드만 IDE, 나머지는 컨테이너 | `docker compose up -d --scale member-api=0` | member-api만 빼고 전부 | member-api |
 | 종료 (모든 경우) | `docker compose down` | - | - |
 
+- 종료를 그냥 `docker compose down`으로 하는 것은 `.env`의 `COMPOSE_PROFILES`가 `all`일 때 기준. 다른 값(예: `db-only`)으로 바꿨다면 그 profile 범위만 정리되므로, 전체를 띄웠을 때는 `docker compose --profile all down`으로 정리
 - `db-only`를 먼저 띄워 둔 상태에서 `--profile front-only up -d`를 따로 실행해도 됨. 이미 떠 있는 DB는 그대로 유지됨
 - IDE의 front와 컨테이너 front는 둘 다 3000 포트를 쓰므로 동시에 띄우지 않음. member-api도 8080으로 같음
 
@@ -189,6 +225,35 @@ docker compose down --rmi local           # 직접 빌드한 앱 이미지까지
 
 - postgres 계정과 database는 데이터 디렉토리가 비어 있을 때(최초 기동)만 적용됨. 이후 비밀번호를 바꾸려면 DB 안에서 `ALTER USER`로 변경
 - Redis 계정은 기동할 때마다 `command`로 설정되므로 `.env`를 바꾸고 다시 `up -d` 하면 바로 적용됨
+
+---
+
+# 문제 해결
+
+## postgres 비밀번호를 바꿨는데 접속이 안 됨 (credential 오류)
+
+- **원인**: postgres는 데이터 디렉토리가 비어 있을 때(최초 기동)만 `.env`의 `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`를 적용함. 이후 `.env`를 바꿔도 DB 안의 계정 정보는 그대로임
+- **이미지 삭제나 `--build`로는 해결되지 않음**: 계정 정보는 이미지가 아니라 bind mount된 데이터 디렉토리(`docker_volume/choimory-dev/postgres`)에 저장되어 있어서, 컨테이너나 이미지를 다시 만들어도 그대로 남음
+- Redis는 기동할 때마다 `command`로 계정을 다시 설정하므로 이 문제가 없음
+
+해결 방법은 둘 중 하나.
+
+```bash
+# A. 데이터 초기화 (데이터를 버려도 될 때). 테이블은 member-api 기동 시 Flyway가 다시 만듦
+docker compose --profile all down
+rm -rf ~/choimory_workspace/DataGripProjects/docker_volume/choimory-dev/postgres
+docker compose up -d
+
+# B. 데이터 유지하고 비밀번호만 변경 (컨테이너 안에서는 비밀번호 없이 접속됨)
+docker exec -it postgres_choimory-dev psql -U <POSTGRES_USER> -d postgres -c "ALTER USER <POSTGRES_USER> PASSWORD '<새 비밀번호>';"
+```
+
+- DataGrip 포트가 `15432`인지도 확인. `5432`로 붙으면 choimory-local의 postgres로 접속됨
+
+## `required variable MEMBER_API_CONTEXT is missing a value`
+
+- `.env`에 `MEMBER_API_CONTEXT`, `FRONT_CONTEXT`가 없을 때 나는 에러. compose에 기본값이 없는 필수 변수라 `db-only`, `down` 등 모든 명령이 멈춤
+- `.env.example`의 두 줄을 `.env`에 복사해 넣음
 
 ---
 

@@ -1,3 +1,36 @@
+# 목차
+
+- [intro](#intro)
+  - [docker run 대신 compose로 관리하는 이유](#docker-run-대신-compose로-관리하는-이유)
+  - [docker run 옵션과의 대응](#docker-run-옵션과의-대응)
+- [디렉토리 구조](#디렉토리-구조)
+- [choimory-server](#choimory-server)
+  - [개요](#개요)
+  - [서버 사양](#서버-사양)
+  - [앱 목록과 포트](#앱-목록과-포트)
+  - [네트워크 / 접근 규칙](#네트워크--접근-규칙)
+  - [디렉토리 / 데이터 규칙](#디렉토리--데이터-규칙)
+  - [compose 작성 규칙](#compose-작성-규칙)
+  - [배포 방법](#배포-방법)
+  - [앱별 참고](#앱별-참고)
+  - [백업](#백업)
+- [choimory-local](#choimory-local)
+  - [개요](#개요-1)
+  - [서비스 목록](#서비스-목록)
+  - [compose 작성 규칙](#compose-작성-규칙-1)
+  - [실행 방법](#실행-방법)
+  - [서비스별 참고](#서비스별-참고)
+- [choimory-dev](#choimory-dev)
+  - [개요](#개요-2)
+  - [서비스 목록](#서비스-목록-1)
+  - [구성](#구성)
+  - [앱 레포의 Docker 파일](#앱-레포의-docker-파일)
+  - [profiles](#profiles)
+  - [실행 방법](#실행-방법-1)
+  - [환경변수 (.env)](#환경변수-env)
+
+---
+
 # intro
 
 - 프로젝트들의 docker compose들을 관리
@@ -22,6 +55,7 @@
 | `postgres:16.15-bookworm` | `image: postgres:16.15-bookworm` |
 
 - 한 번 `up -d` 하면 `restart` 정책에 따라 재부팅 후에도 자동으로 뜸. `docker compose down`을 하면 컨테이너가 삭제되어 다시 `up -d` 필요
+  - choimory-dev는 개발할 때만 띄우는 용도라 `restart` 정책이 없음. 재부팅 후에는 다시 `up -d` 필요
 
 ---
 
@@ -240,7 +274,7 @@ choimory-docker-compose/
 
 ## 구성
 
-- compose 파일 하나(`choimory-dev/compose.yaml`)에 모든 서비스를 두고, 모든 서비스에 profile을 닮
+- compose 파일 하나(`choimory-dev/compose.yaml`)에 모든 서비스를 두고, 모든 서비스에 profile을 붙임
   - profile이 없는 서비스는 어떤 profile을 줘도 항상 뜨므로, `db-only`처럼 일부만 띄우려면 모든 서비스에 profile이 필요함
   - `.env`의 `COMPOSE_PROFILES=all`을 기본값으로 둬서, profile 미지정 `up`/`down`이 전체를 대상으로 함
 - 특정 서비스 빼기는 profile 대신 `--scale <서비스>=0` 사용. 빼는 profile을 만들면 모든 서비스에 그 이름을 달아야 해서 조합이 늘어나기 때문
@@ -261,13 +295,13 @@ choimory-docker-compose/
 
 | 레포 | 파일 | 내용 |
 | --- | --- | --- |
-| choimory-dev-member-api | `Dockerfile` | `eclipse-temurin:21-jdk`에서 gradlew로 `:member-api:bootJar` → `eclipse-temurin:21-jre`로 실행. Gradle 의존성은 BuildKit 캐시 마운트로 재사용 |
+| choimory-dev-member-api | `Dockerfile` | `eclipse-temurin:21.0.13_9-jdk-noble`에서 gradlew로 `:member-api:bootJar` → `eclipse-temurin:21.0.13_9-jre-noble`로 실행. Gradle 의존성은 BuildKit 캐시 마운트로 재사용 |
 | choimory-dev-member-api | `.dockerignore` | 빌드 결과물, IDE, 문서 제외 (`docs/flyway`는 포함) |
-| choimory-dev-front | `Dockerfile` | `node:22-alpine`에서 의존성 설치, 빌드 → standalone 결과물만 실행 |
+| choimory-dev-front | `Dockerfile` | `node:22.23.4-alpine`에서 의존성 설치, 빌드 → standalone 결과물만 실행 |
 | choimory-dev-front | `.dockerignore` | `node_modules`, `.next`, `env/`, `.env*` 등 제외 |
 | choimory-dev-front | `next.config.ts` | `output: "standalone"` |
 
-- 이미지 태그는 패치 버전까지 고정함 (`eclipse-temurin:21.0.13_9-*-noble`, `node:22.23.4-alpine`)
+- 이미지 태그는 패치 버전까지 고정함
 
 ## profiles
 
@@ -285,7 +319,7 @@ choimory-docker-compose/
 ## 실행 방법
 
 1. `cd choimory-dev`
-2. `cp .env.example .env` 후 `changeme`를 실제 값으로 변경. `JWT_SECRET`은 32바이트 이상 (`openssl rand -base64 48`)
+2. `cp .env.example .env` 후 `changeme`를 실제 값으로 변경. `JWT_SECRET`은 32바이트 이상 (`openssl rand -base64 48`). `COMPOSE_PROFILES`(기본 모드)와 `MEMBER_API_CONTEXT`, `FRONT_CONTEXT`(레포 위치)도 확인
 3. 개발 패턴에 맞게 기동
 
 | 개발 패턴 | 명령 | 뜨는 것 |
@@ -296,6 +330,8 @@ choimory-docker-compose/
 | 백엔드 전부 IDE + 프론트는 컨테이너 | `docker compose --profile db-only --profile front-only up -d` | postgres, redis, front |
 | 특정 백엔드만 IDE, 나머지는 컨테이너 | `docker compose up -d --scale member-api=0` | member-api만 빼고 전부 |
 | 종료 (모든 경우) | `docker compose down` | - |
+
+- 종료를 그냥 `docker compose down`으로 하는 것은 `.env`의 `COMPOSE_PROFILES`가 `all`일 때 기준. 다른 값(예: `db-only`)으로 바꿨다면 그 profile 범위만 정리되므로, 전체를 띄웠을 때는 `docker compose --profile all down`으로 정리
 
 ```bash
 # 특정 서비스 빼기: 여러 개는 이어 쓰고, profile과 같이 쓸 수도 있음
@@ -336,4 +372,4 @@ docker compose down --rmi local
 | `MEMBER_API_CONTEXT` | `../../../choimory-dev/choimory-dev-member-api` | member-api 레포 위치 (`build.context`). 필수 값 |
 | `FRONT_CONTEXT` | `../../../choimory-dev/choimory-dev-front` | front 레포 위치 (`build.context`). 필수 값 |
 
-- postgres 계정과 database는 데이터 디렉토리가 비어 있을 때(최초 기동)만 적용됨
+- postgres 계정과 database는 데이터 디렉토리가 비어 있을 때(최초 기동)만 적용됨. 이후 바꾸려면 데이터 디렉토리 삭제 또는 `ALTER USER` (이미지 삭제나 `--build`로는 바뀌지 않음. `choimory-dev/README.md`의 문제 해결 참고)
