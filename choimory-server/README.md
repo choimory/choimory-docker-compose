@@ -23,7 +23,6 @@
   - [Uptime Kuma](#uptime-kuma)
   - [Jellyfin](#jellyfin)
   - [Immich](#immich)
-  - [File Browser](#file-browser)
   - [Vaultwarden](#vaultwarden)
   - [AdGuard Home](#adguard-home)
   - [Samba](#samba)
@@ -62,7 +61,6 @@ choimory-server/
 ├── uptime-kuma/       # compose.yaml
 ├── jellyfin/          # compose.yaml, .env.example
 ├── immich/            # compose.yaml, .env.example
-├── filebrowser/       # compose.yaml
 ├── vaultwarden/       # compose.yaml, .env.example
 ├── adguard-home/      # compose.yaml
 └── samba/             # 호스트 apt 설치, 설정 기록용 README.md만 존재
@@ -82,7 +80,6 @@ choimory-server/
 | Uptime Kuma | 서비스 감시, 알림 | `louislam/uptime-kuma:2.5.8` | 127.0.0.1:3001 | 3001 |
 | Jellyfin | 영상 스트리밍 | `jellyfin/jellyfin:12.4` | 0.0.0.0:8096 | - |
 | Immich | 사진 백업 (구글 포토 대체) | `ghcr.io/immich-app/immich-server:v3.3.5` 외 | 0.0.0.0:2283 | - |
-| File Browser | 웹 파일 접근 | `filebrowser/filebrowser:v2.63.23` | 0.0.0.0:8081 | - |
 | Vaultwarden | 비밀번호 관리자 | `vaultwarden/server:1.37.4` | 127.0.0.1:8080 | 8443 |
 | AdGuard Home (관리) | 광고 차단 DNS 관리 화면 | `adguard/adguardhome:v0.107.79` | 127.0.0.1:3002 | 3002 |
 | AdGuard Home (DNS) | 클라이언트 DNS | 위와 동일 | 0.0.0.0:53 (tcp/udp) | - |
@@ -101,7 +98,7 @@ choimory-server/
 - **관리 화면, Vaultwarden**: `127.0.0.1`에만 바인딩하고 `tailscale serve`로 HTTPS 접근
   - Dockge는 Docker 소켓을 마운트해 사실상 root 권한이므로 반드시 Tailscale로만 접근
   - Vaultwarden은 웹 볼트와 Bitwarden 앱이 HTTPS를 요구하므로 tailscale serve가 TLS를 처리
-- **LAN 기기도 쓰는 앱**(Homepage, Jellyfin, Immich, File Browser): `0.0.0.0`에 바인딩
+- **LAN 기기도 쓰는 앱**(Homepage, Jellyfin, Immich): `0.0.0.0`에 바인딩
   - 공유기 포트포워딩이 없어 인터넷에서는 접근할 수 없음
   - Docker가 공개한 포트는 ufw를 우회하므로 ufw로 막는 방식에 기대지 않음
 
@@ -157,13 +154,13 @@ sudo tailscale serve status                                    # 등록 확인
 | `/data/apps/<앱>/` | 앱별 설정, DB (bind mount) |
 | `/data/storage/media` | Jellyfin 미디어 (읽기 전용 마운트), Samba `media` 공유 |
 | `/data/storage/photos` | Immich 라이브러리 |
-| `/data/storage/files` | 개인 문서 (File Browser, Samba `files` 공유) |
+| `/data/storage/files` | 개인 문서 (Samba `files` 공유) |
 | `/data/backup` | 백업 스테이징 (DB 덤프 등) |
 
 - 코드(이 저장소)와 데이터(`/data/apps`)를 분리하고, compose에서는 절대경로로 bind mount 함
 - named volume은 쓰지 않음
 - `/data/storage`는 앱이 보는 대용량 데이터 경로로 고정함. 디스크를 바꿔도 앱 설정은 그대로 (아래 스토리지 / 마운트 구조 참고)
-- `/data/storage/photos`는 Immich가 관리하므로 File Browser와 Samba로 노출하지 않음. 밖에서 지우거나 옮기면 Immich 데이터가 깨짐
+- `/data/storage/photos`는 Immich가 관리하므로 Samba로 노출하지 않음. 밖에서 지우거나 옮기면 Immich 데이터가 깨짐
 
 ## 스토리지 / 마운트 구조
 
@@ -175,7 +172,7 @@ sudo tailscale serve status                                    # 등록 확인
 | 앱 | `/data/storage/...` | 역할(무엇을 담는지) | 바뀌지 않음 |
 
 - 디스크는 `/mnt/<장치>`에 마운트하고, 그 안의 폴더를 `/data/storage/...`에 bind mount로 연결함
-- 앱(Jellyfin, File Browser, Samba, Immich)은 `/data/storage`만 바라보므로 디스크가 외장하드든 DAS든 앱 설정을 바꾸지 않음
+- 앱(Jellyfin, Samba, Immich)은 `/data/storage`만 바라보므로 디스크가 외장하드든 DAS든 앱 설정을 바꾸지 않음
 - 경로 이름을 `nas`나 `das`로 짓지 않은 이유: NAS 장비는 없고, DAS 도입 전에는 같은 경로가 내장 SSD에 있으며, 나중에 장치를 바꾸면 이름이 실제와 어긋나기 때문
 
 ### 단계별 구성
@@ -242,7 +239,7 @@ UUID=xxxx  /mnt/disk-a  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
 - 여러 디스크의 용량을 합쳐야 하면 RAID 대신 mergerfs를 검토 (디스크 하나가 빠져도 나머지 파일은 유지됨)
 - 파일시스템은 ext4로 포맷함. exFAT은 소유권·권한이 없어 `1000:1500` 권한 구조가 적용되지 않음
 - USB 너머 SMART 확인은 `sudo smartctl -a -d sat /dev/sdX`
-- 디스크가 빠진 상태로 컨테이너가 뜨면 비어 있는 마운트 지점(내장 SSD)에 파일을 쓸 수 있으므로, File Browser와 Samba 쪽은 마운트 상태를 감시함
+- 디스크가 빠진 상태로 컨테이너가 뜨면 비어 있는 마운트 지점(내장 SSD)에 파일을 쓸 수 있으므로, Samba 쪽은 마운트 상태를 감시함
 
 ## 앱별 데이터 경로
 
@@ -253,7 +250,6 @@ UUID=xxxx  /mnt/disk-a  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
 | Uptime Kuma | `/data/apps/uptime-kuma/data` |
 | Jellyfin | `/data/apps/jellyfin/{config,cache}`, `/data/storage/media` (ro) |
 | Immich | `/data/apps/immich/{postgres,model-cache}`, `/data/storage/photos` |
-| File Browser | `/data/apps/filebrowser/{database,config}`, `/data/storage/files` |
 | Vaultwarden | `/data/apps/vaultwarden/data` |
 | AdGuard Home | `/data/apps/adguard-home/{work,conf}` |
 
@@ -276,7 +272,7 @@ UUID=xxxx  /mnt/disk-a  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
 | 방식 | 대상 |
 | --- | --- |
 | `PUID`/`PGID` 환경변수 (`1000`/`1500`) | Homepage |
-| `user: "1000:1500"` | Jellyfin, File Browser, Vaultwarden |
+| `user: "1000:1500"` | Jellyfin, Vaultwarden |
 | 컨테이너 내부 root (생성 파일이 root 소유) | Dockge, Uptime Kuma, Immich, AdGuard Home |
 
 - linuxserver 계열처럼 PUID/PGID를 지원하는 이미지만 환경변수로 지정하고, 그 외에는 `user`로 지정함
@@ -312,7 +308,7 @@ UUID=xxxx  /mnt/disk-a  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
 4. `docker compose config`로 확인 후 `docker compose up -d`, 또는 Dockge 화면에서 기동
 5. 필요한 앱은 `tailscale serve` 등록
 
-권장 기동 순서: Dockge → Homepage, Uptime Kuma → Jellyfin → Immich, File Browser, Samba → Vaultwarden, AdGuard Home
+권장 기동 순서: Dockge → Homepage, Uptime Kuma → Jellyfin → Immich, Samba → Vaultwarden, AdGuard Home
 
 ## 자주 쓰는 명령
 
@@ -466,11 +462,12 @@ docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device 
 - 백업은 폰 → 서버 한 방향. 사진 앱에서 지운 사진은 Immich에 남고, Immich 앱에서 지울 때 기기 / 서버 / 둘 다를 선택 가능
 - 서버가 꺼져 있는 동안 찍은 사진은 복구 후 다음 백업 때 "서버에 없는 사진"으로 잡혀 올라감
 
-## File Browser
+## 제외한 앱: File Browser
 
-- 파일 탐색의 주 수단은 Samba이고, File Browser는 Samba가 없는 기기에서 가끔 쓰는 용도
-- `/data/storage/files`만 노출
-- 최초 admin 비밀번호는 첫 기동 로그에 출력됨 (`docker logs filebrowser`)
+- 웹 브라우저용 파일 탐색기로 계획했으나 제외함 (2026-11)
+- 원작 File Browser는 2026-09-01에 저장소가 아카이브되어 이후 새 버전, 버그 수정, 보안 수정이 없음. 마지막 버전(`v2.63.23`) 이후 공개된 보안 권고는 고쳐지지 않음
+- 파일 탐색은 Samba(Finder, 탐색기, iOS 파일 앱)로 충분하므로 별도 웹 탐색기를 두지 않음
+- 웹으로 파일을 꺼내거나 링크로 공유해야 할 일이 생기면 유지보수 중인 대체 앱(FileBrowser Quantum 등)을 새로 검토
 
 ## Vaultwarden
 

@@ -77,7 +77,6 @@ choimory-docker-compose/
     ├── uptime-kuma/
     ├── jellyfin/
     ├── immich/
-    ├── filebrowser/
     ├── vaultwarden/
     ├── adguard-home/
     └── samba/             # 호스트 apt 설치, 설정 기록용 README.md만 존재
@@ -110,7 +109,6 @@ choimory-docker-compose/
 | Uptime Kuma | 서비스 감시, 알림 | `louislam/uptime-kuma:2.5.8` | 127.0.0.1:3001 | 3001 |
 | Jellyfin | 영상 스트리밍 | `jellyfin/jellyfin:12.4` | 0.0.0.0:8096 | - |
 | Immich | 사진 백업 | `ghcr.io/immich-app/immich-server:v3.3.5` 외 | 0.0.0.0:2283 | - |
-| File Browser | 웹 파일 접근 | `filebrowser/filebrowser:v2.63.23` | 0.0.0.0:8081 | - |
 | Vaultwarden | 비밀번호 관리자 | `vaultwarden/server:1.37.4` | 127.0.0.1:8080 | 8443 |
 | AdGuard Home (관리) | 광고 차단 DNS 관리 화면 | `adguard/adguardhome:v0.107.79` | 127.0.0.1:3002 | 3002 |
 | AdGuard Home (DNS) | 클라이언트 DNS | 위와 동일 | 0.0.0.0:53 (tcp/udp) | - |
@@ -138,7 +136,7 @@ choimory-docker-compose/
 | `/data/apps/<앱>/` | 앱별 설정, DB (bind mount) |
 | `/data/storage/media` | Jellyfin 미디어 (읽기 전용 마운트) |
 | `/data/storage/photos` | Immich 라이브러리 |
-| `/data/storage/files` | 개인 문서 (File Browser, Samba) |
+| `/data/storage/files` | 개인 문서 (Samba) |
 | `/data/backup` | 백업 스테이징 (DB 덤프 등) |
 | `/data/dev/choimory-dev/repo` | choimory-dev 프로젝트 저장소 clone 위치 |
 | `/data/dev/choimory-dev/k8s` | k3s PV 저장 위치 (`--default-local-storage-path`). choimory-dev의 DB, Redis 데이터가 PVC로 생성됨 |
@@ -151,7 +149,7 @@ choimory-docker-compose/
 - named volume은 쓰지 않음
 - `/data/storage`는 앱이 보는 대용량 데이터 경로로 고정함. 실제 디스크(외장하드, 향후 DAS)는 `/mnt/<장치>`에 마운트하고 bind mount로 연결하므로, 디스크를 바꿔도 앱 설정은 그대로
   - 이름을 `nas`, `das`처럼 장치 기준이 아니라 역할 기준으로 지은 이유와 마운트 구조는 `choimory-server/README.md`의 스토리지 / 마운트 구조 참고
-- `/data/storage/photos`는 Immich가 관리하므로 File Browser와 Samba로 노출하지 않음
+- `/data/storage/photos`는 Immich가 관리하므로 Samba로 노출하지 않음
 
 ## compose 작성 규칙
 
@@ -163,7 +161,7 @@ choimory-docker-compose/
 - `TZ: Asia/Seoul`
 - 실행 계정은 choimory:homeserver (`1000:1500`)
   - linuxserver 계열처럼 PUID/PGID를 지원하는 이미지는 환경변수로 지정함 (Homepage)
-  - 그 외 이미지는 `user: "1000:1500"`으로 지정함 (Jellyfin, File Browser, Vaultwarden)
+  - 그 외 이미지는 `user: "1000:1500"`으로 지정함 (Jellyfin, Vaultwarden)
   - Dockge, Uptime Kuma, Immich, AdGuard Home은 컨테이너 내부 root로 실행되어 생성 파일이 root 소유가 됨
 - 비밀번호, 토큰, 서버별 값은 `.env`로 분리함. `.env.example`만 커밋하고 `.env`는 gitignore 대상
 - compose 파일 상단 주석에 앱 용도, 접속 방법, 사전 준비 명령(`mkdir`, `tailscale serve`)을 적음
@@ -177,7 +175,7 @@ choimory-docker-compose/
    - bind mount 경로가 없으면 Docker가 root 소유로 디렉토리를 만들어, `user`로 실행하는 컨테이너가 권한 오류로 실패함
 4. `docker compose config`로 확인 후 `docker compose up -d`, 또는 Dockge 화면에서 기동
 
-권장 기동 순서: Dockge → Homepage, Uptime Kuma → Jellyfin → Immich, File Browser, Samba → Vaultwarden, AdGuard Home
+권장 기동 순서: Dockge → Homepage, Uptime Kuma → Jellyfin → Immich, Samba → Vaultwarden, AdGuard Home
 
 ## 앱별 참고
 

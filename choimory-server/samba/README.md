@@ -33,7 +33,7 @@ sudo smbpasswd -a choimory
 `/etc/samba/smb.conf` 맨 아래에 추가한다.
 
 ```ini
-# 개인 문서 공유 (File Browser와 같은 디렉토리)
+# 개인 문서 공유
 [files]
    path = /data/storage/files
    valid users = choimory
