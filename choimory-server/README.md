@@ -430,6 +430,41 @@ docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device 
 - redis(Valkey), postgres는 외부에 포트를 노출하지 않음. postgres 이미지를 다른 것으로 바꾸면 기동하지 않음
 - 머신러닝은 CPU로 실행 (ROCm은 이미지가 크고 실험적). 동영상 하드웨어 트랜스코딩이 필요하면 `devices` 주석 해제
 - DB는 파일 복사가 아니라 `pg_dump`로 백업
+- `DB_PASSWORD`는 첫 `up -d` 전에 정함. DB가 처음 만들어질 때 고정되어, 이후 `.env`만 바꾸면 접속 실패
+  ```bash
+  # 랜덤 비밀번호(0-9, a-f 48자)를 생성해 .env에 바로 넣기 (Immich는 영문·숫자만 허용)
+  sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$(openssl rand -hex 24)/" .env
+  ```
+- `docker compose config`는 `.env` 값을 그대로 출력하므로 비밀번호가 화면에 노출됨에 주의
+
+### 관리 화면 설정
+
+아래 값은 compose가 아니라 Immich 웹 관리 화면에서 설정한 것으로, DB(`/data/apps/immich/postgres`)에 저장됨
+
+| 위치 | 항목 | 값 |
+| --- | --- | --- |
+| 첫 설정 | 스토리지 템플릿 | `YYYY/MM/DD` (`library/<레이블>/2026/11/02/...`) |
+| 관리 > 사용자 > 편집 | 스토리지 레이블 | `choimory` (기본 `admin`) |
+| 관리 > 설정 > 서버 설정 | 외부 도메인 | `http://choimory-server.<tailnet>.ts.net:2283` |
+| 관리 > 설정 > 기계 학습 > 스마트 검색 | CLIP 모델 | `nllb-clip-base-siglip__v1` (한국어 포함 다국어. 기본 `ViT-B-32__openai`는 영어 위주) |
+| 관리 > 설정 > 기계 학습 | URL | `http://immich-machine-learning:3003` (기본값 유지) |
+
+- 스토리지 템플릿·레이블을 바꾸면 작업 대기열 > 스토리지 템플릿 마이그레이션 실행 (이미 올라간 사진 이동)
+- CLIP 모델을 바꾸면 작업 대기열 > 스마트 검색 > 모두 실행 (기존 임베딩과 호환되지 않음)
+- 머신러닝 모델은 처음 사용할 때 Hugging Face에서 받아 `/data/apps/immich/model-cache`에 저장. HF_TOKEN 경고는 무시해도 됨
+- 모델 로딩 확인
+  ```bash
+  docker compose logs --tail 40 immich-machine-learning | grep -i -A1 "loading"
+  ```
+
+### 아이폰 앱
+
+- 서버 주소는 Tailscale 주소(`http://choimory-server.<tailnet>.ts.net:2283`)로 등록 (집 밖에서도 백업)
+- 백업 앨범 `최근 항목`(전체), 모바일 데이터 사용 끔, 백그라운드 백업 켬, 백업 후 기기에서 삭제 끔
+- 원본은 아이폰·iCloud에 유지 (외장하드 백업 전까지 Immich를 유일한 사본으로 두지 않음)
+- iCloud 저장 공간 최적화 상태여도 앱이 iCloud에서 원본을 받아 원본 화질로 백업. 첫 백업은 와이파이·충전 중 앱 화면을 켜둔 채로 진행해야 빠름
+- 백업은 폰 → 서버 한 방향. 사진 앱에서 지운 사진은 Immich에 남고, Immich 앱에서 지울 때 기기 / 서버 / 둘 다를 선택 가능
+- 서버가 꺼져 있는 동안 찍은 사진은 복구 후 다음 백업 때 "서버에 없는 사진"으로 잡혀 올라감
 
 ## File Browser
 
@@ -471,3 +506,5 @@ docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device 
 - DAS를 연결할 때 Kopia를 다시 검토함. 저장소를 DAS에 두고 `/data/apps`와 DB 덤프를 백업하는 방식
 - 그 전까지 Vaultwarden 볼트는 Bitwarden 앱의 내보내기로 수동 보관함
 - 백업 우선순위: Vaultwarden 데이터, Immich DB(`pg_dump`)와 사진, 나머지 `/data/apps`
+- Immich는 매일 DB를 자동 덤프해 `/data/storage/photos/backups`에 저장함. 같은 SSD라 SSD 고장 대비는 안 되므로 외장하드 백업 대상에 포함
+- 현재 사진 사본은 iCloud 원본 + Immich 서버 두 곳
