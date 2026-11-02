@@ -46,6 +46,8 @@
 | CPU | AMD Ryzen 7 7735HS (8코어 16스레드) |
 | GPU | Radeon 680M 내장 (VA-API, `/dev/dri/renderD128`) |
 | RAM | 26Gi 사용 가능 |
+| LAN IP | `192.168.10.201` (ipTIME DHCP 고정 할당. 자동 할당 범위 `.2 ~ .200` 밖의 `.201` 이상을 고정 기기용으로 사용) |
+| Tailscale | `choimory-server` (MagicDNS) |
 | 실행 계정 | choimory:homeserver (`1000:1500`) |
 
 ---
