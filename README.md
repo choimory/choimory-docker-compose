@@ -134,12 +134,18 @@ choimory-docker-compose/
 
 | 경로 | 용도 |
 | --- | --- |
-| `/data/dev/repos/choimory-docker-compose` | 이 저장소 clone 위치. Dockge stacks 경로는 이 아래 `choimory-server` |
+| `/data/dev/choimory/repo/choimory-docker-compose` | 이 저장소 clone 위치. Dockge stacks 경로는 이 아래 `choimory-server` |
 | `/data/apps/<앱>/` | 앱별 설정, DB (bind mount) |
 | `/data/storage/media` | Jellyfin 미디어 (읽기 전용 마운트) |
 | `/data/storage/photos` | Immich 라이브러리 |
 | `/data/storage/files` | 개인 문서 (File Browser, Samba) |
 | `/data/backup` | 백업 스테이징 (DB 덤프 등) |
+| `/data/dev/choimory-dev/repo` | choimory-dev 프로젝트 저장소 clone 위치 |
+| `/data/dev/choimory-dev/k8s` | k3s PV 저장 위치 (`--default-local-storage-path`). choimory-dev의 DB, Redis 데이터가 PVC로 생성됨 |
+
+- `/data/dev`는 프로젝트 단위로 나눔 (`choimory`: 개인 저장소, `choimory-dev`: 토이프로젝트)
+- k3s DB 데이터는 PVC를 선언하면 local-path provisioner가 `pvc-<id>_<네임스페이스>_<PVC이름>` 폴더를 자동 생성하므로 별도 docker volume 경로를 두지 않음
+- k3s 저장 경로는 클러스터 전체 설정이라, 다른 프로젝트를 k3s에 올리면 그 PV도 `choimory-dev/k8s` 아래에 생김. 그때 경로 변경 또는 프로젝트별 StorageClass 분리를 검토
 
 - 코드(이 저장소)와 데이터(`/data/apps`)를 분리하고, compose에서는 절대경로로 bind mount 함
 - named volume은 쓰지 않음
@@ -165,7 +171,7 @@ choimory-docker-compose/
 
 ## 배포 방법
 
-1. 서버의 `/data/dev/repos/`에 저장소 clone
+1. 서버의 `/data/dev/choimory/repo/`에 저장소 clone
 2. 앱 디렉토리에서 `.env.example`을 복사해 `.env` 작성
 3. compose 상단 주석의 사전 준비 명령 실행
    - bind mount 경로가 없으면 Docker가 root 소유로 디렉토리를 만들어, `user`로 실행하는 컨테이너가 권한 오류로 실패함

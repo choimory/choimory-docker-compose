@@ -134,7 +134,7 @@ sudo tailscale serve status                                    # 등록 확인
 
 | 경로 | 용도 |
 | --- | --- |
-| `/data/dev/repos/choimory-docker-compose` | 이 저장소 clone 위치. Dockge stacks 경로는 이 아래 `choimory-server` |
+| `/data/dev/choimory/repo/choimory-docker-compose` | 이 저장소 clone 위치. Dockge stacks 경로는 이 아래 `choimory-server` |
 | `/data/apps/<앱>/` | 앱별 설정, DB (bind mount) |
 | `/data/storage/media` | Jellyfin 미디어 (읽기 전용 마운트), Samba `media` 공유 |
 | `/data/storage/photos` | Immich 라이브러리 |
@@ -283,7 +283,7 @@ UUID=xxxx  /mnt/disk-a  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
 
 # 배포 방법
 
-1. 서버의 `/data/dev/repos/`에 저장소 clone
+1. 서버의 `/data/dev/choimory/repo/`에 저장소 clone
 2. 앱 디렉토리에서 `.env.example`을 복사해 `.env` 작성
 3. compose 상단 주석의 사전 준비 명령 실행
    - bind mount 경로가 없으면 Docker가 root 소유로 디렉토리를 만들어, `user`로 실행하는 컨테이너가 권한 오류로 실패함
