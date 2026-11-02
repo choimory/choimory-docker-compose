@@ -8,6 +8,7 @@
   - [바인딩 기준](#바인딩-기준)
   - [tailscale serve 등록](#tailscale-serve-등록)
   - [Jellyfin 외부 시청](#jellyfin-외부-시청)
+  - [Tailscale 클라이언트 서브넷 경로](#tailscale-클라이언트-서브넷-경로)
   - [AdGuard Home DNS 구성](#adguard-home-dns-구성)
 - [디렉토리 / 데이터 규칙](#디렉토리--데이터-규칙)
   - [앱별 데이터 경로](#앱별-데이터-경로)
@@ -119,7 +120,21 @@ sudo tailscale serve status                                    # 등록 확인
 ## Jellyfin 외부 시청
 
 - Cloudflare Tunnel로 노출하지 않음 (대용량 영상 전송은 Cloudflare 약관 문제 소지)
-- 밖에서는 Tailscale을 켜고 접속
+- 밖에서는 Tailscale을 켜고 Tailscale 주소(`choimory-server.<tailnet>.ts.net:8096`)로 접속. 모바일 앱에도 LAN 주소가 아닌 Tailscale 주소로 등록
+- 속도 상한은 원룸 인터넷 업로드 속도와 밖의 네트워크 속도 중 느린 쪽이라, 밖에서는 화질을 낮춰서 봄
+
+## Tailscale 클라이언트 서브넷 경로
+
+- 서버는 서브넷 라우터로 `192.168.10.0/24`를 광고함 (밖에서 Tailscale이 없는 집 기기에 접속하는 용도)
+- 집 LAN 안에 있는 기기(데스크톱)는 서브넷 경로를 받지 않음: `tailscale set --accept-routes=false`
+  - 받아들이면 Tailscale 통신 경로가 꼬여 공유기 밖 공인 IP로 나갔다 들어오는 헤어핀이 생기고, 동영상 스트리밍처럼 대용량 전송이 크게 느려짐
+  - 끄면 LAN 주소는 랜으로 바로, Tailscale 주소도 집 안 직접 연결(`tailscale ping`이 `via 192.168.10.201:41641`)
+- 이 설정은 기기 단위로 어디서든 적용됨. 끈 기기는 밖에서 `192.168.10.x` 주소(공유기 관리 화면 등)에 못 들어가지만, Tailscale 주소로 접속하는 서버 앱은 그대로 사용 가능
+- 밖에서 공유기 관리 화면이 필요하면 SSH 터널 사용
+  ```bash
+  # 내 localhost:8081을 서버 기준 192.168.10.1:80(공유기 관리 화면)으로 연결. 브라우저에서 http://localhost:8081
+  ssh -L 8081:192.168.10.1:80 choimory@choimory-server
+  ```
 
 ## AdGuard Home DNS 구성
 
@@ -330,9 +345,67 @@ docker compose down                            # 중지 및 컨테이너 삭제 
 ## Jellyfin
 
 - VA-API 하드웨어 트랜스코딩 사용. `/dev/dri/renderD128`을 넘기고 render 그룹(`RENDER_GID`)을 추가함
-- 관리 화면 > 재생 > 트랜스코딩에서 VA-API, 장치 `/dev/dri/renderD128` 지정
-- 검증: `docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device /dev/dri/renderD128`
-- 미디어는 읽기 전용 마운트. 메타데이터는 `/config`에 저장
+- 미디어는 읽기 전용 마운트. 메타데이터, 썸네일, 트릭플레이 이미지는 `/config`에 저장
+- 아래 설정은 compose가 아니라 Jellyfin 관리 화면에서 한 것이라, 재설치 시 같은 값으로 다시 설정함 (`/data/apps/jellyfin/config`를 복원하면 유지됨)
+
+### GPU 확인
+
+```bash
+# 서버의 GPU 장치와 render 그룹 GID 확인 (GID는 .env의 RENDER_GID)
+ls -l /dev/dri
+getent group render | cut -d: -f3
+
+# 컨테이너 안에서 VA-API로 GPU를 읽을 수 있는지 확인 (AMD Radeon 680M과 지원 코덱 목록이 나오면 성공)
+docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device /dev/dri/renderD128
+```
+
+| 코덱 | 하드웨어 디코딩 | 하드웨어 인코딩 |
+| --- | --- | --- |
+| H.264 | O | O |
+| HEVC 8bit / 10bit | O | O |
+| VP9 8bit / 10bit | O | X |
+| AV1 | O | X |
+| MPEG-2, VC-1, VP8 | X | X |
+
+### 관리 화면 설정
+
+| 위치 | 항목 | 값 |
+| --- | --- | --- |
+| 재생 > 트랜스코딩 | 하드웨어 가속 | `Video Acceleration API (VAAPI)` |
+| 재생 > 트랜스코딩 | VA API 장치 | `/dev/dri/renderD128` |
+| 재생 > 트랜스코딩 | 하드웨어 디코딩 | `H264`, `HEVC`, `VP9`, `AV1`, `HEVC 10bit`, `VP9 10bit`만 체크 (나머지는 미지원이라 체크하지 않음) |
+| 재생 > 트랜스코딩 | 하드웨어 인코딩 활성화 | 체크 |
+| 재생 > 트랜스코딩 | Intel 저전력 인코더, VPP 톤 매핑, 톤 매핑 | 끔 (인텔 전용 또는 HDR용) |
+| 재생 > 트랜스코딩 | HEVC 하드웨어 인코딩, AV1 인코딩 | 끔 (H.264로 변환. AV1 인코딩은 680M 미지원) |
+| 네트워킹 | LAN 네트워크 | `192.168.10.0/24, 100.64.0.0/10` |
+| 초기 설정 | 원격 접속 허용 | 체크 |
+| 초기 설정 | 메타데이터 언어 / 국가 | Korean / South Korea |
+
+- LAN 네트워크에 Tailscale 대역(`100.64.0.0/10`)을 넣는 이유
+  - 비워두면 Jellyfin은 컨테이너 내부 대역(`172.x`)만 LAN으로 보고, Tailscale 기기(`100.x`)는 원격으로 판단해 화질 제한을 걸고 트랜스코딩함
+  - `100.64.0.0/10`으로 서버에 닿을 수 있는 건 tailnet 기기뿐이라 LAN으로 취급해도 안전함
+  - 대신 밖(LTE 등)에서 볼 때도 원본을 보내려 하므로, 밖에서 쓰는 기기는 재생 화질을 직접 낮춤 (예: `1080p 8~10Mbps`)
+- 트랜스코딩 확인 (`h264_vaapi`가 보이면 GPU 인코딩. `libx264`는 로그 앞부분 FFmpeg 빌드 정보에 걸린 것이라 무시)
+  ```bash
+  docker exec jellyfin sh -c 'ls -t /config/log/FFmpeg.Transcode-* | head -1 | xargs grep -o -m5 -E "h264_vaapi|libx264|hwaccel vaapi"'
+  ```
+
+### 라이브러리
+
+| 라이브러리 | 콘텐츠 유형 | 폴더 (컨테이너 경로) |
+| --- | --- | --- |
+| 게임 | 홈 비디오 및 사진 | `/media/games` |
+
+- 폴더는 서버 경로(`/data/storage/media/...`)가 아니라 컨테이너 경로(`/media/...`)로 지정
+- 게임 녹화 영상은 인터넷 영화 DB 검색이 필요 없으므로 홈 비디오 유형 사용 (파일 이름 그대로 표시, 썸네일은 영상에서 추출)
+- 하위 폴더는 게임별로 나눔 (`/data/storage/media/games/EternalReturn/` 등). `/data/storage/media` 전체가 마운트돼 있어 새 폴더를 만들어도 compose 수정 불필요
+- 옵션: 실시간 모니터링 켬, 트릭플레이 이미지 추출 켬, Nfo 저장과 미디어 폴더에 아트워크·트릭플레이 저장은 끔(읽기 전용), 챕터 이미지 끔
+
+### 재생 화질
+
+- 브라우저 재생기 화질이 `자동`이면 처음 측정한 속도보다 낮게 상한을 잡아, 고비트레이트 원본(게임 녹화 약 100Mbps)도 트랜스코딩됨
+- 집에서 쓰는 기기는 프로필 > 설정 > 재생에서 최대 스트리밍 품질을 가장 높은 값으로 저장 → 다이렉트 재생
+- 브라우저는 접속 주소(LAN 주소, Tailscale 주소)마다 설정을 따로 저장하므로 주소별로 각각 설정
 
 ## Immich
 
