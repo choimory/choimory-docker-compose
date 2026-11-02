@@ -493,7 +493,9 @@ docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device 
 
 - 445 포트, 호스트 계정과 권한에 엮여 있어 컨테이너가 아닌 호스트에 apt로 설치
 - 공유: `files`(`/data/storage/files`), `media`(`/data/storage/media`). `force group = homeserver`로 컨테이너(`1000:1500`)와 권한을 맞춤
-- 설치, 설정, 가족 계정 추가 방법은 `samba/README.md` 참고
+- 맥 호환을 위해 `[global]`에 `fruit` VFS 모듈 적용 (메타데이터를 xattr로 저장, 맥 서버 아이콘)
+- 접속: 윈도우 `\\192.168.10.201`, 맥 `smb://choimory-server`, 밖에서는 Tailscale
+- 설치, 설정, 접속, 권한, 문제 해결, 가족 계정 추가 방법은 `samba/README.md` 참고
 
 ---
 
