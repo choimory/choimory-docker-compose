@@ -35,7 +35,7 @@ sudo smbpasswd -a choimory
 ```ini
 # 개인 문서 공유 (File Browser와 같은 디렉토리)
 [files]
-   path = /data/nas/files
+   path = /data/storage/files
    valid users = choimory
    read only = no
    # 새 파일도 homeserver 그룹으로 생성해, 컨테이너(1000:1500)와 권한을 맞춘다.
@@ -45,7 +45,7 @@ sudo smbpasswd -a choimory
 
 # 미디어 공유 (Jellyfin 라이브러리에 영상 추가용)
 [media]
-   path = /data/nas/media
+   path = /data/storage/media
    valid users = choimory
    read only = no
    force group = homeserver
@@ -53,7 +53,7 @@ sudo smbpasswd -a choimory
    directory mask = 2775
 ```
 
-- `/data/nas/photos`는 Immich가 관리하므로 공유하지 않는다. 여기서 파일을 지우거나 옮기면 Immich 데이터가 깨진다.
+- `/data/storage/photos`는 Immich가 관리하므로 공유하지 않는다. 여기서 파일을 지우거나 옮기면 Immich 데이터가 깨진다.
 
 ```bash
 # 설정 문법 검사 후 재시작

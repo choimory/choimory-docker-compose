@@ -10,7 +10,7 @@
 name: immich
 
 services:
-  # API 서버 + 웹 화면. 업로드된 사진은 UPLOAD_LOCATION(/data/nas/photos)에 저장된다.
+  # API 서버 + 웹 화면. 업로드된 사진은 UPLOAD_LOCATION(/data/storage/photos)에 저장된다.
   immich-server:
     container_name: immich_server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION}

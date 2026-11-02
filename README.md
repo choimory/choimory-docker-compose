@@ -136,15 +136,16 @@ choimory-docker-compose/
 | --- | --- |
 | `/data/dev/repos/choimory-docker-compose` | 이 저장소 clone 위치. Dockge stacks 경로는 이 아래 `choimory-server` |
 | `/data/apps/<앱>/` | 앱별 설정, DB (bind mount) |
-| `/data/nas/media` | Jellyfin 미디어 (읽기 전용 마운트) |
-| `/data/nas/photos` | Immich 라이브러리 |
-| `/data/nas/files` | 개인 문서 (File Browser, Samba) |
+| `/data/storage/media` | Jellyfin 미디어 (읽기 전용 마운트) |
+| `/data/storage/photos` | Immich 라이브러리 |
+| `/data/storage/files` | 개인 문서 (File Browser, Samba) |
 | `/data/backup` | 백업 스테이징 (DB 덤프 등) |
 
 - 코드(이 저장소)와 데이터(`/data/apps`)를 분리하고, compose에서는 절대경로로 bind mount 함
 - named volume은 쓰지 않음
-- `/data/nas`는 나중에 대용량 디스크(DAS)를 마운트할 자리라 앱 설정 변경 없이 디스크만 교체 가능
-- `/data/nas/photos`는 Immich가 관리하므로 File Browser와 Samba로 노출하지 않음
+- `/data/storage`는 앱이 보는 대용량 데이터 경로로 고정함. 실제 디스크(외장하드, 향후 DAS)는 `/mnt/<장치>`에 마운트하고 bind mount로 연결하므로, 디스크를 바꿔도 앱 설정은 그대로
+  - 이름을 `nas`, `das`처럼 장치 기준이 아니라 역할 기준으로 지은 이유와 마운트 구조는 `choimory-server/README.md`의 스토리지 / 마운트 구조 참고
+- `/data/storage/photos`는 Immich가 관리하므로 File Browser와 Samba로 노출하지 않음
 
 ## compose 작성 규칙
 

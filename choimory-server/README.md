@@ -136,15 +136,94 @@ sudo tailscale serve status                                    # 등록 확인
 | --- | --- |
 | `/data/dev/repos/choimory-docker-compose` | 이 저장소 clone 위치. Dockge stacks 경로는 이 아래 `choimory-server` |
 | `/data/apps/<앱>/` | 앱별 설정, DB (bind mount) |
-| `/data/nas/media` | Jellyfin 미디어 (읽기 전용 마운트), Samba `media` 공유 |
-| `/data/nas/photos` | Immich 라이브러리 |
-| `/data/nas/files` | 개인 문서 (File Browser, Samba `files` 공유) |
+| `/data/storage/media` | Jellyfin 미디어 (읽기 전용 마운트), Samba `media` 공유 |
+| `/data/storage/photos` | Immich 라이브러리 |
+| `/data/storage/files` | 개인 문서 (File Browser, Samba `files` 공유) |
 | `/data/backup` | 백업 스테이징 (DB 덤프 등) |
 
 - 코드(이 저장소)와 데이터(`/data/apps`)를 분리하고, compose에서는 절대경로로 bind mount 함
 - named volume은 쓰지 않음
-- `/data/nas`는 나중에 대용량 디스크(DAS)를 마운트할 자리라 앱 설정 변경 없이 디스크만 교체 가능
-- `/data/nas/photos`는 Immich가 관리하므로 File Browser와 Samba로 노출하지 않음. 밖에서 지우거나 옮기면 Immich 데이터가 깨짐
+- `/data/storage`는 앱이 보는 대용량 데이터 경로로 고정함. 디스크를 바꿔도 앱 설정은 그대로 (아래 스토리지 / 마운트 구조 참고)
+- `/data/storage/photos`는 Immich가 관리하므로 File Browser와 Samba로 노출하지 않음. 밖에서 지우거나 옮기면 Immich 데이터가 깨짐
+
+## 스토리지 / 마운트 구조
+
+### 경로를 두 층으로 나눔
+
+| 층 | 경로 | 이름 기준 | 바뀌는 시점 |
+| --- | --- | --- | --- |
+| 장치 | `/mnt/<장치>` (`/mnt/disk-a`, `/mnt/das` 등) | 장치 이름 | 디스크를 추가·교체할 때 |
+| 앱 | `/data/storage/...` | 역할(무엇을 담는지) | 바뀌지 않음 |
+
+- 디스크는 `/mnt/<장치>`에 마운트하고, 그 안의 폴더를 `/data/storage/...`에 bind mount로 연결함
+- 앱(Jellyfin, File Browser, Samba, Immich)은 `/data/storage`만 바라보므로 디스크가 외장하드든 DAS든 앱 설정을 바꾸지 않음
+- 경로 이름을 `nas`나 `das`로 짓지 않은 이유: NAS 장비는 없고, DAS 도입 전에는 같은 경로가 내장 SSD에 있으며, 나중에 장치를 바꾸면 이름이 실제와 어긋나기 때문
+
+### 단계별 구성
+
+**현재 (내장 SSD만)**: `/data/storage` 하위 폴더가 그대로 내장 SSD에 있음
+
+**외장하드 허브 연결 시**
+
+```txt
+/mnt/disk-a                  ← 외장하드 A
+/mnt/disk-b                  ← 외장하드 B (백업 전용, Kopia 저장소)
+
+/data/storage/media   → /mnt/disk-a/media   (bind mount)
+/data/storage/files   → /mnt/disk-a/files   (bind mount)
+/data/storage/photos  → 내장 SSD 그대로 (대체 불가 데이터라 가장 안정적인 곳에 두고 외장하드 B로 백업)
+```
+
+**DAS 도입 시**
+
+```txt
+/mnt/das                     ← DAS
+
+/data/storage/media   → /mnt/das/media
+/data/storage/files   → /mnt/das/files
+/data/storage/photos  → 내장 SSD 유지 또는 /mnt/das/photos
+/mnt/disk-a, disk-b   → 백업용으로 전환하거나 은퇴
+```
+
+- 옮길 때는 데이터를 rsync로 복사하고 fstab bind mount 줄의 왼쪽 경로만 바꿈
+
+### fstab 예시
+
+```txt
+# 장치 마운트 (장치가 바뀌면 이 줄만 수정)
+UUID=xxxx  /mnt/disk-a  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
+
+# 앱 경로 연결 (장치가 바뀌면 왼쪽 경로만 수정)
+/mnt/disk-a/media  /data/storage/media  none  bind,nofail  0 0
+/mnt/disk-a/files  /data/storage/files  none  bind,nofail  0 0
+```
+
+- `nofail`: 디스크가 연결되지 않아도 서버가 부팅되게 함
+- `x-systemd.device-timeout=10s`: 디스크가 없을 때 부팅이 오래 멈추지 않게 함
+- UUID는 `sudo blkid`로 확인. `/dev/sdb` 같은 장치명은 연결 순서에 따라 바뀌므로 쓰지 않음
+- 수정 후 재부팅 전에 `sudo mount -a`로 오류가 없는지 확인
+
+### 리눅스 마운트 개념
+
+- 우분투 서버는 USB 디스크를 꽂아도 자동으로 어디에도 마운트하지 않음. `lsblk`에 `/dev/sdb` 같은 장치로만 보임
+- 어디에 붙일지는 fstab 또는 `mount` 명령으로 직접 정함. 장치 종류(외장하드, DAS)에 따라 경로가 정해지는 것이 아님
+- 마운트하면 하위 폴더가 생기는 것이 아니라, 마운트 지점 폴더 자체가 그 디스크의 최상위가 됨
+  ```bash
+  sudo mkdir -p /mnt/disk-a
+  sudo mount /dev/sdb1 /mnt/disk-a
+  ls /mnt/disk-a        # 외장하드 안의 파일이 바로 보임 (/mnt/disk-a/외장하드/... 가 아님)
+  ```
+- bind mount는 이미 마운트된 경로의 특정 폴더를 다른 경로에서도 보이게 연결하는 것. 디스크 안의 `media` 폴더를 `/data/storage/media`로 보이게 할 때 사용
+- 마운트 지점에 원래 파일이 있었으면, 마운트하는 동안 그 파일은 가려짐 (삭제되는 것은 아니고 마운트 해제하면 다시 보임). 그래서 마운트 지점은 빈 폴더로 두고, 내장 SSD에 있던 데이터는 디스크로 먼저 옮긴 뒤 마운트함
+
+### 외장하드 허브 사용 시 주의
+
+- 2.5인치(USB 전원) 외장하드를 여러 개 연결할 때는 유전원 허브를 사용함
+- USB 허브 위에 RAID(mdadm, ZFS)를 구성하지 않음. 디스크가 잠깐 끊기면 배열이 깨지거나 재구성에 들어감. 디스크는 하나씩 독립적으로 사용
+- 여러 디스크의 용량을 합쳐야 하면 RAID 대신 mergerfs를 검토 (디스크 하나가 빠져도 나머지 파일은 유지됨)
+- 파일시스템은 ext4로 포맷함. exFAT은 소유권·권한이 없어 `1000:1500` 권한 구조가 적용되지 않음
+- USB 너머 SMART 확인은 `sudo smartctl -a -d sat /dev/sdX`
+- 디스크가 빠진 상태로 컨테이너가 뜨면 비어 있는 마운트 지점(내장 SSD)에 파일을 쓸 수 있으므로, File Browser와 Samba 쪽은 마운트 상태를 감시함
 
 ## 앱별 데이터 경로
 
@@ -153,9 +232,9 @@ sudo tailscale serve status                                    # 등록 확인
 | Dockge | `/data/apps/dockge/data` |
 | Homepage | `/data/apps/homepage/config` |
 | Uptime Kuma | `/data/apps/uptime-kuma/data` |
-| Jellyfin | `/data/apps/jellyfin/{config,cache}`, `/data/nas/media` (ro) |
-| Immich | `/data/apps/immich/{postgres,model-cache}`, `/data/nas/photos` |
-| File Browser | `/data/apps/filebrowser/{database,config}`, `/data/nas/files` |
+| Jellyfin | `/data/apps/jellyfin/{config,cache}`, `/data/storage/media` (ro) |
+| Immich | `/data/apps/immich/{postgres,model-cache}`, `/data/storage/photos` |
+| File Browser | `/data/apps/filebrowser/{database,config}`, `/data/storage/files` |
 | Vaultwarden | `/data/apps/vaultwarden/data` |
 | AdGuard Home | `/data/apps/adguard-home/{work,conf}` |
 
@@ -192,7 +271,7 @@ sudo tailscale serve status                                    # 등록 확인
 | dockge | `STACKS_DIR` | stacks 경로 절대경로. 컨테이너 안팎 경로를 같게 마운트함 |
 | homepage | `HOMEPAGE_ALLOWED_HOSTS` | 접속 주소(`host:port`) 목록. LAN IP, Tailscale IP, MagicDNS 이름을 쉼표로 구분 |
 | jellyfin | `RENDER_GID` | 서버 render 그룹 GID (`getent group render \| cut -d: -f3`) |
-| immich | `UPLOAD_LOCATION` | 사진 저장 위치 (`/data/nas/photos`) |
+| immich | `UPLOAD_LOCATION` | 사진 저장 위치 (`/data/storage/photos`) |
 | immich | `DB_DATA_LOCATION` | Immich Postgres 데이터 위치 (`/data/apps/immich/postgres`) |
 | immich | `IMMICH_VERSION` | Immich 버전 (`v3.3.5`) |
 | immich | `DB_PASSWORD` | Immich Postgres 비밀번호. A-Za-z0-9만 사용 |
@@ -264,7 +343,7 @@ docker compose down                            # 중지 및 컨테이너 삭제 
 ## File Browser
 
 - 파일 탐색의 주 수단은 Samba이고, File Browser는 Samba가 없는 기기에서 가끔 쓰는 용도
-- `/data/nas/files`만 노출
+- `/data/storage/files`만 노출
 - 최초 admin 비밀번호는 첫 기동 로그에 출력됨 (`docker logs filebrowser`)
 
 ## Vaultwarden
@@ -290,7 +369,7 @@ docker compose down                            # 중지 및 컨테이너 삭제 
 ## Samba
 
 - 445 포트, 호스트 계정과 권한에 엮여 있어 컨테이너가 아닌 호스트에 apt로 설치
-- 공유: `files`(`/data/nas/files`), `media`(`/data/nas/media`). `force group = homeserver`로 컨테이너(`1000:1500`)와 권한을 맞춤
+- 공유: `files`(`/data/storage/files`), `media`(`/data/storage/media`). `force group = homeserver`로 컨테이너(`1000:1500`)와 권한을 맞춤
 - 설치, 설정, 가족 계정 추가 방법은 `samba/README.md` 참고
 
 ---

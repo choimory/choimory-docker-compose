@@ -23,7 +23,7 @@ services:
     volumes:
       # 개인 문서 디렉토리만 노출한다.
       # Immich가 관리하는 photos나 media를 여기서 지우거나 옮기면 Immich, Jellyfin 데이터가 깨질 수 있다.
-      - /data/nas/files:/srv
+      - /data/storage/files:/srv
       - /data/apps/filebrowser/database:/database
       - /data/apps/filebrowser/config:/config
 
