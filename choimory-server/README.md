@@ -126,10 +126,12 @@ sudo tailscale serve status                                    # 등록 확인
 ## Tailscale 클라이언트 서브넷 경로
 
 - 서버는 서브넷 라우터로 `192.168.10.0/24`를 광고함 (밖에서 Tailscale이 없는 집 기기에 접속하는 용도)
-- 집 LAN 안에 있는 기기(데스크톱)는 서브넷 경로를 받지 않음: `tailscale set --accept-routes=false`
+- 집 LAN 안에서 쓰는 기기(데스크톱, 맥북)는 서브넷 경로를 받지 않음: `tailscale set --accept-routes=false`
+  - 맥북도 `true`면 집 와이파이에서 같은 헤어핀이 생겨 매우 느렸고, `false`로 바꾼 뒤 정상
   - 받아들이면 Tailscale 통신 경로가 꼬여 공유기 밖 공인 IP로 나갔다 들어오는 헤어핀이 생기고, 동영상 스트리밍처럼 대용량 전송이 크게 느려짐
   - 끄면 LAN 주소는 랜으로 바로, Tailscale 주소도 집 안 직접 연결(`tailscale ping`이 `via 192.168.10.201:41641`)
 - 이 설정은 기기 단위로 어디서든 적용됨. 끈 기기는 밖에서 `192.168.10.x` 주소(공유기 관리 화면 등)에 못 들어가지만, Tailscale 주소로 접속하는 서버 앱은 그대로 사용 가능
+- 모든 클라이언트가 서브넷 경로를 쓰지 않으면 서버의 광고도 해제 가능 (`sudo tailscale set --advertise-routes=`, exit node 설정은 유지). 현재는 광고를 유지한 채 클라이언트에서만 받지 않음
 - 밖에서 공유기 관리 화면이 필요하면 SSH 터널 사용
   ```bash
   # 내 localhost:8081을 서버 기준 192.168.10.1:80(공유기 관리 화면)으로 연결. 브라우저에서 http://localhost:8081
@@ -406,6 +408,20 @@ docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device 
 - 브라우저 재생기 화질이 `자동`이면 처음 측정한 속도보다 낮게 상한을 잡아, 고비트레이트 원본(게임 녹화 약 100Mbps)도 트랜스코딩됨
 - 집에서 쓰는 기기는 프로필 > 설정 > 재생에서 최대 스트리밍 품질을 가장 높은 값으로 저장 → 다이렉트 재생
 - 브라우저는 접속 주소(LAN 주소, Tailscale 주소)마다 설정을 따로 저장하므로 주소별로 각각 설정
+
+### 기기별 사용
+
+| 기기 | `accept-routes` | 접속 | 화질 |
+| --- | --- | --- | --- |
+| 데스크톱 (유선) | false | 브라우저, LAN 또는 Tailscale 주소 | 원본 (다이렉트 재생) |
+| 맥북 (와이파이, 외출) | false | 브라우저, Tailscale 주소 | 자동 또는 FHD~2K |
+| 아이패드 (와이파이) | 기본값 | 크롬, Tailscale 주소 | FHD~2K |
+| 밖 (LTE, 핫스팟) | - | Tailscale 주소 | 1080p 8~10Mbps 이하 |
+
+- 와이파이 기기는 원본(게임 녹화 약 100Mbps)을 꾸준히 받기 버거우므로 화질을 낮춤. 낮추면 서버 GPU가 해상도를 낮춰 변환해 여유 있게 따라감
+- iOS 공식 Jellyfin 앱은 iOS 기본 재생기가 녹화 파일(H.264 Level 5.2, 120fps, 100Mbps)을 그대로 못 받아 서버에 원본급 변환을 요청하고, 변환이 실시간을 못 따라가 거의 재생되지 않음 → 크롬으로 사용
+- 앱이 필요하면 무료는 Swiftfin, 호환성·편의는 Infuse Pro (Jellyfin 원격 사용은 Pro 필요)
+- 근본 해결: 녹화 설정을 1440p 60fps, 30~50Mbps, HEVC로 낮추면 기기별 차이가 대부분 사라짐
 
 ## Immich
 
