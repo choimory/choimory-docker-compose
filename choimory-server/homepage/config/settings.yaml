@@ -1,0 +1,19 @@
+# Homepage 전체 설정
+# 서버의 /data/apps/homepage/config/settings.yaml로 복사해서 쓴다.
+title: choimory-server
+language: ko
+theme: dark
+color: slate
+headerStyle: clean
+
+# 그룹 이름은 services.yaml의 그룹 이름과 같아야 적용된다.
+layout:
+  관리:
+    style: row
+    columns: 2
+  미디어·사진:
+    style: row
+    columns: 2
+  파일:
+    style: row
+    columns: 2

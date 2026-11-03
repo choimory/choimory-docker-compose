@@ -7,6 +7,7 @@
 - [네트워크 / 접근 규칙](#네트워크--접근-규칙)
   - [바인딩 기준](#바인딩-기준)
   - [tailscale serve 등록](#tailscale-serve-등록)
+  - [Docker 공용 네트워크 (homeserver)](#docker-공용-네트워크-homeserver)
   - [Jellyfin 외부 시청](#jellyfin-외부-시청)
   - [Tailscale 클라이언트 서브넷 경로](#tailscale-클라이언트-서브넷-경로)
   - [AdGuard Home DNS 구성](#adguard-home-dns-구성)
@@ -57,8 +58,8 @@
 ```txt
 choimory-server/
 ├── dockge/            # compose.yaml, .env.example
-├── homepage/          # compose.yaml, .env.example
-├── uptime-kuma/       # compose.yaml
+├── homepage/          # compose.yaml, .env.example, config/ (Homepage 설정 원본)
+├── uptime-kuma/       # compose.yaml, disk-push.sh (디스크 용량 Push 스크립트)
 ├── jellyfin/          # compose.yaml, .env.example
 ├── immich/            # compose.yaml, .env.example
 ├── vaultwarden/       # compose.yaml, .env.example
@@ -113,6 +114,36 @@ sudo tailscale serve status                                    # 등록 확인
 ```
 
 - Tailscale 관리 콘솔 > DNS > HTTPS Certificates 활성화 필요
+
+## Docker 공용 네트워크 (homeserver)
+
+- compose 프로젝트마다 전용 망(`<프로젝트>_default`)이 따로 생겨서 프로젝트끼리는 서로 보이지 않음
+- Uptime Kuma, Homepage가 다른 앱 상태를 확인할 수 있도록 공용 망 `homeserver`를 만들고 앱 컨테이너를 함께 붙임
+- 같은 망 안에서는 컨테이너 이름으로 접속함 (`http://dockge:5001`). 서버 포트를 거치지 않으므로 `127.0.0.1`에 묶은 앱도 확인 가능
+- 각 앱은 전용 망(`default`)을 유지한 채 `homeserver`를 추가로 붙임. DB, Redis, ML 같은 내부 컨테이너는 붙이지 않음
+
+| 컨테이너 | 공용 망 주소 |
+| --- | --- |
+| `dockge` | `http://dockge:5001` |
+| `homepage` | `http://homepage:3000` |
+| `uptime-kuma` | `http://uptime-kuma:3001` |
+| `jellyfin` | `http://jellyfin:8096` |
+| `immich_server` | `http://immich_server:2283` |
+
+```bash
+# 공용 망 생성 (서버에서 한 번만. 이 망이 없으면 붙어 있는 앱이 기동하지 않음)
+docker network create homeserver
+
+# 공용 망에 붙은 컨테이너 확인
+docker network inspect homeserver --format '{{range .Containers}}{{.Name}} {{end}}'
+```
+
+### 공용 망을 쓰는 이유
+
+- `tailscale serve`는 실제 포트를 여는 게 아니라 Tailscale 안에서 요청을 가로채 처리함
+  - Tailscale로 들어온 요청과 서버 자신의 요청만 받고, Docker 망(172.x)에서 온 요청은 `Connection refused`
+  - 그래서 컨테이너에서 `https://choimory-server.<tailnet>.ts.net:5001`로 Dockge를 확인할 수 없음 (`extra_hosts`로 이름을 알려줘도 동일)
+- Uptime Kuma를 `network_mode: host`로 바꾸는 방법도 있지만, 격리가 풀리고 Homepage에서는 여전히 확인할 수 없어 공용 망을 선택함
 
 ## Jellyfin 외부 시청
 
@@ -260,6 +291,7 @@ UUID=xxxx  /mnt/disk-a  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
 - 앱 하나에 디렉토리 하나, 파일명은 `compose.yaml`
 - 최상단에 `name:`으로 프로젝트명을 고정함
 - 앱 전체를 묶는 루트 compose는 만들지 않음. Dockge 스택 관리와 `container_name` 충돌 때문이며, 일괄 기동이 필요하면 스크립트로 처리
+- 다른 앱이 상태를 확인해야 하는 앱 컨테이너는 공용 망 `homeserver`(external)에 추가로 붙임. 내부 컨테이너(DB, Redis 등)는 붙이지 않음
 - 이미지 태그는 버전까지 고정함. Immich의 redis와 postgres는 공식 compose의 digest를 그대로 씀
 - `restart: unless-stopped`
 - `TZ: Asia/Seoul`
@@ -300,7 +332,7 @@ UUID=xxxx  /mnt/disk-a  ext4  defaults,nofail,x-systemd.device-timeout=10s  0 2
 
 1. 서버의 `/data/dev/choimory/repo/`에 저장소 clone
 2. 앱 디렉토리에서 `.env.example`을 복사해 `.env` 작성
-3. compose 상단 주석의 사전 준비 명령 실행
+3. compose 상단 주석의 사전 준비 명령 실행 (처음 한 번은 `docker network create homeserver` 포함)
    - bind mount 경로가 없으면 Docker가 root 소유로 디렉토리를 만들어, `user`로 실행하는 컨테이너가 권한 오류로 실패함
    ```bash
    mkdir -p /data/apps/<앱>/...
@@ -333,10 +365,53 @@ docker compose down                            # 중지 및 컨테이너 삭제 
 ## Homepage
 
 - 서비스 목록은 `/data/apps/homepage/config/services.yaml` 등 설정 파일로 관리 (최초 기동 시 기본 파일 생성)
+- 설정 원본은 저장소 `homepage/config/`에 두고 서버로 복사함. 비밀값이 없어 커밋해도 되고, 서버를 다시 깔아도 그대로 복구됨
+
+| 파일 | 내용 |
+| --- | --- |
+| `settings.yaml` | 제목, 한국어, 다크 테마, 그룹 배치 |
+| `services.yaml` | 관리(Dockge, Uptime Kuma), 미디어·사진(Jellyfin, Immich), 파일(Samba 접속 안내) |
+| `bookmarks.yaml` | 공유기 관리 화면, Tailscale 관리 콘솔, GitHub 저장소 |
+| `widgets.yaml` | CPU·메모리·디스크 사용량, 날짜·시간 |
+
+```bash
+# 저장소 설정을 서버 Homepage 설정 폴더로 복사 (Homepage가 자동으로 다시 읽음)
+cp /data/dev/choimory/repo/choimory-docker-compose/choimory-server/homepage/config/*.yaml /data/apps/homepage/config/
+```
+
+- 링크(`href`)는 MagicDNS 전체 이름(`choimory-server.<tailnet>.ts.net`)을 씀. Tailscale 기기는 집 안·밖 같은 주소로 접속
+- 상태 표시(`siteMonitor`)는 공용 망 컨테이너 이름으로 확인함
+- 보류한 Vaultwarden, AdGuard Home은 등록하지 않음
 - Docker 소켓은 마운트하지 않음. 컨테이너 상태 표시가 필요하면 docker-socket-proxy를 붙임
 - `HOMEPAGE_ALLOWED_HOSTS`에 없는 주소로 접속하면 요청을 거부함
 
 ## Uptime Kuma
+
+- 모니터는 공용 망 `homeserver`의 컨테이너 이름으로 등록함
+
+| 모니터 | 종류 | 대상 | 비고 |
+| --- | --- | --- | --- |
+| Dockge | HTTP(s) | `http://dockge:5001` | |
+| Homepage | HTTP(s) | `http://homepage:3000` | `.env`의 `HOMEPAGE_ALLOWED_HOSTS`에 `homepage:3000` 필요 |
+| Jellyfin | HTTP(s) - 키워드 | `http://jellyfin:8096/health` | 키워드 `Healthy` |
+| Immich | HTTP(s) - 키워드 | `http://immich_server:2283/api/server/ping` | 키워드 `pong` |
+| Samba | TCP 포트 | `192.168.10.201` : `445` | 호스트 서비스라 LAN IP로 확인 |
+| 디스크 용량 | Push | 서버 cron이 5분마다 보고 | 하트비트 간격 600초 |
+
+### 디스크 용량 감시
+
+- Uptime Kuma에는 서버 디스크를 직접 보는 모니터가 없어 `disk-push.sh`가 사용률을 재서 Push 모니터로 보냄
+- 기준(기본 80%) 미만이면 `up`, 이상이면 `down`. 스크립트가 멈춰 보고가 끊겨도 Push 모니터가 `down`이 됨
+- Push URL에는 토큰이 들어 있으므로 저장소가 아니라 서버 crontab에만 적음
+
+```bash
+# 스크립트 직접 실행해 보기 (Push URL은 Uptime Kuma Push 모니터 화면에서 ? 앞부분만 복사)
+/data/dev/choimory/repo/choimory-docker-compose/choimory-server/uptime-kuma/disk-push.sh 'http://127.0.0.1:3001/api/push/<토큰>' 80 /
+
+# choimory 계정 crontab에 5분마다 실행 등록
+crontab -e
+# */5 * * * * /data/dev/choimory/repo/choimory-docker-compose/choimory-server/uptime-kuma/disk-push.sh 'http://127.0.0.1:3001/api/push/<토큰>' 80 /
+```
 
 - AdGuard Home은 HTTP가 아닌 DNS 모니터 타입으로 `<Tailscale IP>:53`을 감시해야 실제 DNS 응답을 확인할 수 있음
 

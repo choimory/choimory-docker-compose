@@ -1,4 +1,6 @@
 # Uptime Kuma: choimory-server 서비스 다운 감시 및 알림
+# 모니터는 공용 망 homeserver의 컨테이너 이름으로 등록한다. (예: http://dockge:5001) 127.0.0.1에 묶인 앱도 확인할 수 있다.
+# 디스크 용량은 Push 모니터 + 서버 cron(disk-push.sh)으로 감시한다.
 # AdGuard Home은 HTTP가 아닌 DNS 모니터 타입으로 <Tailscale IP>:53을 감시해야 실제 DNS 응답 여부를 확인할 수 있다.
 #
 # 접속: Tailscale 전용 관리 화면
@@ -7,6 +9,7 @@
 #
 # 사전 준비
 #   mkdir -p /data/apps/uptime-kuma/data
+#   docker network create homeserver   (공용 망, 서버에서 한 번만)
 name: uptime-kuma
 
 services:
@@ -19,9 +22,21 @@ services:
     ports:
       - "127.0.0.1:3001:3001"
 
+    # 공용 망 homeserver: Uptime Kuma·Homepage가 컨테이너 이름(uptime-kuma:3001)으로 상태를 확인한다.
+    # 프로젝트 전용 망(default)은 그대로 유지한다.
+    networks:
+      - default
+      - homeserver
+
     # 기본 이미지는 컨테이너 내부 root로 실행되므로 data 디렉토리 파일은 root 소유로 생성된다.
     volumes:
       - /data/apps/uptime-kuma/data:/app/data
 
     environment:
       TZ: Asia/Seoul
+
+networks:
+  # 앱 간 상태 확인용 공용 망. 서버에서 한 번만 만든다. (docker network create homeserver)
+  # 망이 없으면 컨테이너가 기동하지 않으므로 삭제하지 않는다.
+  homeserver:
+    external: true

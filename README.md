@@ -73,8 +73,8 @@ choimory-docker-compose/
 │   └── mysql/
 └── choimory-server/       # 홈서버 미니PC의 개인용 앱 compose
     ├── dockge/            # compose.yaml, .env.example
-    ├── homepage/
-    ├── uptime-kuma/
+    ├── homepage/          # config/: Homepage 설정 원본
+    ├── uptime-kuma/       # disk-push.sh: 디스크 용량 Push 스크립트
     ├── jellyfin/
     ├── immich/
     ├── vaultwarden/
@@ -122,6 +122,7 @@ choimory-docker-compose/
 - **LAN 기기도 쓰는 앱**(Jellyfin, Immich 등): `0.0.0.0`에 바인딩
   - 공유기 포트포워딩이 없어 인터넷에서는 접근할 수 없음
   - Docker가 공개한 포트는 ufw를 우회하므로 ufw로 막는 방식에 기대지 않음
+- **공용 Docker 망 `homeserver`**: Uptime Kuma, Homepage가 컨테이너 이름(`http://dockge:5001` 등)으로 다른 앱 상태를 확인함. `tailscale serve`는 컨테이너에서 온 요청을 받지 않아서 이 방식을 씀
 - **Jellyfin**: Cloudflare Tunnel로 노출하지 않음 (대용량 영상 전송은 Cloudflare 약관 문제 소지)
 - **AdGuard Home**
   - 서버의 systemd-resolved 스텁 리스너를 끄고, 서버 자신은 외부 DNS(1.1.1.1, 8.8.8.8)를 씀. AdGuard 장애 시에도 서버를 복구할 수 있게 하기 위함

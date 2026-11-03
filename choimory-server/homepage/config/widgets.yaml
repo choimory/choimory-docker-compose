@@ -1,0 +1,18 @@
+# Homepage 상단 정보 위젯
+# 서버의 /data/apps/homepage/config/widgets.yaml로 복사해서 쓴다.
+
+# 서버 자원 사용량
+# 컨테이너 안에서 읽지만 CPU·메모리는 서버 전체 값이 보인다.
+# 디스크 /는 컨테이너 루트지만 서버 루트 파일시스템(/data 포함)과 같은 디스크라 서버 사용률로 볼 수 있다.
+- resources:
+    cpu: true
+    memory: true
+    disk: /
+
+# 날짜·시간
+- datetime:
+    locale: ko
+    format:
+      dateStyle: long
+      timeStyle: short
+      hour12: false
