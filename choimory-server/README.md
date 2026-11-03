@@ -382,6 +382,7 @@ cp /data/dev/choimory/repo/choimory-docker-compose/choimory-server/homepage/conf
 - 링크(`href`)는 MagicDNS 전체 이름(`choimory-server.<tailnet>.ts.net`)을 씀. Tailscale 기기는 집 안·밖 같은 주소로 접속
 - 상태 표시(`siteMonitor`)는 공용 망 컨테이너 이름으로 확인함
 - 보류한 Vaultwarden, AdGuard Home은 등록하지 않음
+- 북마크 그룹 이름은 서비스 그룹 이름과 겹치지 않게 지음 (`바로가기`). 같은 이름이면 북마크가 표시되지 않음
 - Docker 소켓은 마운트하지 않음. 컨테이너 상태 표시가 필요하면 docker-socket-proxy를 붙임
 - `HOMEPAGE_ALLOWED_HOSTS`에 없는 주소로 접속하면 요청을 거부함
 
