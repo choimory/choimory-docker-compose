@@ -80,7 +80,7 @@ choimory-server/
 | Uptime Kuma | 서비스 감시, 알림 | `louislam/uptime-kuma:2.5.8` | 127.0.0.1:3001 | 3001 |
 | Jellyfin | 영상 스트리밍 | `jellyfin/jellyfin:12.4` | 0.0.0.0:8096 | - |
 | Immich | 사진 백업 (구글 포토 대체) | `ghcr.io/immich-app/immich-server:v3.3.5` 외 | 0.0.0.0:2283 | - |
-| Vaultwarden | 비밀번호 관리자 | `vaultwarden/server:1.37.4` | 127.0.0.1:8080 | 8443 |
+| Vaultwarden (보류) | 비밀번호 관리자 | `vaultwarden/server:1.37.4` | 127.0.0.1:8080 | 8443 |
 | AdGuard Home (관리) | 광고 차단 DNS 관리 화면 | `adguard/adguardhome:v0.107.79` | 127.0.0.1:3002 | 3002 |
 | AdGuard Home (DNS) | 클라이언트 DNS | 위와 동일 | 0.0.0.0:53 (tcp/udp) | - |
 | Samba | 네트워크 드라이브 | 호스트 apt 설치 | 445 | - |
@@ -471,6 +471,9 @@ docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device 
 
 ## Vaultwarden
 
+- **보류 (2026-11)**: 비밀번호는 크롬 비밀번호 관리자로 관리 중이라 당장 필요 없음. compose 파일은 남겨두고 필요해지면 설치
+  - 설치하게 되면 외장 디스크 백업(Kopia)을 갖춘 뒤 진행. 처음엔 크롬 비밀번호를 복사만 해서 같이 써보고 넘어감
+  - 필요해지는 경우: 크롬 외 브라우저를 주로 쓸 때, TOTP·카드·보안 메모를 한곳에서 관리할 때, 가족 공유, 구글 계정과 비밀번호 보관 분리
 - `DOMAIN`은 tailscale serve 주소와 포트까지 일치해야 웹 볼트, 첨부파일 링크, 패스키가 정상 동작함
 - `ADMIN_TOKEN` 해시 생성: `docker run --rm -it vaultwarden/server:1.37.4 /vaultwarden hash`. `$`가 compose 변수로 해석되지 않게 작은따옴표로 감쌈
 - 계정 생성 순서: `SIGNUPS_ALLOWED=true`로 기동 → 본인 계정 생성 → `false`로 바꾸고 `docker compose up -d`
