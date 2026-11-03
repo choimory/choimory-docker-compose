@@ -81,8 +81,8 @@ choimory-server/
 | Jellyfin | 영상 스트리밍 | `jellyfin/jellyfin:12.4` | 0.0.0.0:8096 | - |
 | Immich | 사진 백업 (구글 포토 대체) | `ghcr.io/immich-app/immich-server:v3.3.5` 외 | 0.0.0.0:2283 | - |
 | Vaultwarden (보류) | 비밀번호 관리자 | `vaultwarden/server:1.37.4` | 127.0.0.1:8080 | 8443 |
-| AdGuard Home (관리) | 광고 차단 DNS 관리 화면 | `adguard/adguardhome:v0.107.79` | 127.0.0.1:3002 | 3002 |
-| AdGuard Home (DNS) | 클라이언트 DNS | 위와 동일 | 0.0.0.0:53 (tcp/udp) | - |
+| AdGuard Home (관리, 보류) | 광고 차단 DNS 관리 화면 | `adguard/adguardhome:v0.107.79` | 127.0.0.1:3002 | 3002 |
+| AdGuard Home (DNS, 보류) | 클라이언트 DNS | 위와 동일 | 0.0.0.0:53 (tcp/udp) | - |
 | Samba | 네트워크 드라이브 | 호스트 apt 설치 | 445 | - |
 
 - `0.0.0.0` 앱 접속: `http://<서버 LAN IP 또는 Tailscale IP>:<포트>`
@@ -481,6 +481,7 @@ docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device 
 
 ## AdGuard Home
 
+- **보류 (2026-11)**: 당장 필요하지 않음. 서버 DNS 설정(systemd-resolved)을 건드리는 작업이라 필요해질 때 진행. compose 파일은 남겨둠
 - 사전 준비 (53번 포트 확보, 서버 자신은 외부 DNS 사용)
   ```bash
   sudo mkdir -p /etc/systemd/resolved.conf.d
