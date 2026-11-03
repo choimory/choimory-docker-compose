@@ -8,6 +8,9 @@
   - [사용 방법](#사용-방법)
   - [주의할 점](#주의할-점)
   - [변경된 파일](#변경된-파일)
+- [README 최종 점검](#readme-최종-점검)
+  - [답변](#답변)
+  - [수정한 내용](#수정한-내용)
 
 ---
 
@@ -104,3 +107,24 @@
 | `Dockerfile` | 신규. `node:22.23.4-alpine`, standalone 실행 |
 | `.dockerignore` | 신규 |
 | `next.config.ts` | `output: "standalone"` 추가 |
+
+---
+
+# README 최종 점검
+
+> 수정 진행해주고, readme마다 목차도 만들어줘
+
+## 답변
+
+README 3개(루트, choimory-dev, choimory-local)를 실제 설정과 대조해 점검한 결과를 반영하고, 저장소의 README 5개에 목차를 추가함. choimory-local은 사용자가 이전 안내를 이미 정리해 두어 내용 수정은 없었음.
+
+## 수정한 내용
+
+| 파일 | 내용 |
+| --- | --- |
+| `README.md` | 개발 패턴 명령 표 아래에 "그냥 `down`은 `COMPOSE_PROFILES=all` 기준, 다른 값이면 `--profile all down`" 주의 추가. 앱 레포 Dockerfile 표의 이미지를 실제 태그(`eclipse-temurin:21.0.13_9-*-noble`, `node:22.23.4-alpine`)로 통일. "profile을 닮" → "profile을 붙임". 도입부에 "choimory-dev는 restart 정책 없음" 추가. 실행 방법 2단계에 `COMPOSE_PROFILES`, `*_CONTEXT` 확인 추가. postgres 계정 변경 시 주의 보강 |
+| `choimory-dev/README.md` | 명령 표 아래 `COMPOSE_PROFILES` 주의 추가. "처음 한 번"에 `.env`에서 확인할 값 표 추가. `# 문제 해결` 섹션 추가 (postgres 비밀번호 변경 후 credential 오류: 원인, 이미지/`--build`와 무관한 이유, 데이터 초기화/`ALTER USER` 해결법, 포트 확인 / `MEMBER_API_CONTEXT` 필수 변수 에러) |
+| README 5개 | 맨 위에 `# 목차` 추가 (H1~H3, GitHub 앵커 규칙. 같은 제목은 `-1`, `-2`로 구분. 코드 블록 안의 `#` 주석은 제외) |
+
+- 목차 추가 대상: `README.md`, `choimory-local/README.md`, `choimory-dev/README.md`, `choimory-server/README.md`, `choimory-server/samba/README.md`
+

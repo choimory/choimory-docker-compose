@@ -1,4 +1,5 @@
 # AdGuard Home: 광고 차단 DNS
+# 상태: 보류. 당장 필요하지 않아 설치하지 않음. 필요해지면 아래 사전 준비부터 진행한다.
 # Tailscale DNS(전역 네임서버)에 서버 Tailscale IP를 등록하면 밖에서도 광고 차단이 적용된다.
 #
 # 접속: 관리 화면은 Tailscale 전용

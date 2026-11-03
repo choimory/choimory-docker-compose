@@ -9,6 +9,7 @@
 #
 # 사전 준비
 #   mkdir -p /data/apps/jellyfin/{config,cache}
+#   docker network create homeserver   (공용 망, 서버에서 한 번만)
 name: jellyfin
 
 services:
@@ -32,11 +33,23 @@ services:
     ports:
       - "8096:8096"
 
+    # 공용 망 homeserver: Uptime Kuma·Homepage가 컨테이너 이름(jellyfin:8096)으로 상태를 확인한다.
+    # 프로젝트 전용 망(default)은 그대로 유지한다.
+    networks:
+      - default
+      - homeserver
+
     volumes:
       - /data/apps/jellyfin/config:/config
       - /data/apps/jellyfin/cache:/cache
       # 미디어 원본은 Jellyfin이 수정하지 않도록 읽기 전용으로 마운트한다. 메타데이터는 /config에 저장된다.
-      - /data/nas/media:/media:ro
+      - /data/storage/media:/media:ro
 
     environment:
       TZ: Asia/Seoul
+
+networks:
+  # 앱 간 상태 확인용 공용 망. 서버에서 한 번만 만든다. (docker network create homeserver)
+  # 망이 없으면 컨테이너가 기동하지 않으므로 삭제하지 않는다.
+  homeserver:
+    external: true

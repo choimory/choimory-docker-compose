@@ -1,0 +1,41 @@
+# Homepage 서비스 목록
+# 서버의 /data/apps/homepage/config/services.yaml로 복사해서 쓴다.
+#
+# href: 브라우저가 여는 주소
+#   Tailscale 기기는 집 안·밖 모두 MagicDNS 전체 이름으로 접속한다. (accept-routes=false라 집 안에서는 직접 연결)
+# siteMonitor: Homepage 컨테이너가 상태를 확인하는 주소
+#   공용 망 homeserver의 컨테이너 이름으로 확인하므로 127.0.0.1에 묶인 앱(Dockge, Uptime Kuma)도 확인할 수 있다.
+#   대상 컨테이너가 homeserver 망에 없으면 항상 빨간색으로 표시된다.
+# 보류한 Vaultwarden, AdGuard Home은 등록하지 않는다.
+
+# 서버 관리 도구 (Tailscale 전용, tailscale serve HTTPS)
+- 관리:
+    - Dockge:
+        icon: dockge.png
+        href: https://choimory-server.tailb8b0b7.ts.net:5001
+        description: compose 스택 관리
+        siteMonitor: http://dockge:5001
+    - Uptime Kuma:
+        icon: uptime-kuma.png
+        href: https://choimory-server.tailb8b0b7.ts.net:3001
+        description: 서비스 감시, 알림
+        siteMonitor: http://uptime-kuma:3001
+
+# LAN·Tailscale 기기가 쓰는 앱
+- 미디어·사진:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: http://choimory-server.tailb8b0b7.ts.net:8096
+        description: 영상 스트리밍
+        siteMonitor: http://jellyfin:8096/health
+    - Immich:
+        icon: immich.png
+        href: http://choimory-server.tailb8b0b7.ts.net:2283
+        description: 사진 백업
+        siteMonitor: http://immich_server:2283/api/server/ping
+
+# 웹 화면이 없는 호스트 서비스. 접속 방법 안내만 표시한다.
+- 파일:
+    - Samba:
+        icon: mdi-folder-network
+        description: "맥 ⌘K smb://choimory-server · 윈도우 \\\\192.168.10.201"

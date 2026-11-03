@@ -1,10 +1,13 @@
 # Homepage: choimory-server 서비스 링크 대시보드
 # 서비스 목록은 /data/apps/homepage/config/services.yaml 등 설정 파일로 관리한다. (최초 기동 시 기본 파일 자동 생성)
+# 설정 원본은 저장소 homepage/config/에 두고 서버로 복사한다. 수정하면 Homepage가 자동으로 다시 읽는다.
+#   cp config/*.yaml /data/apps/homepage/config/
 #
 # 접속: LAN, Tailscale (http://<서버 IP>:3000)
 #
 # 사전 준비
 #   mkdir -p /data/apps/homepage/config
+#   docker network create homeserver   (공용 망, 서버에서 한 번만)
 name: homepage
 
 services:
@@ -16,6 +19,12 @@ services:
     # 링크 모음만 제공하므로 LAN 기기에서도 접근할 수 있게 전체 인터페이스에 바인딩한다.
     ports:
       - "3000:3000"
+
+    # 공용 망 homeserver: Uptime Kuma·Homepage가 컨테이너 이름(homepage:3000)으로 상태를 확인한다.
+    # 프로젝트 전용 망(default)은 그대로 유지한다.
+    networks:
+      - default
+      - homeserver
 
     # Docker 소켓은 마운트하지 않는다.
     # 컨테이너 상태 표시가 필요해지면 소켓을 직접 넣지 말고 docker-socket-proxy를 붙인다.
@@ -29,3 +38,9 @@ services:
       TZ: Asia/Seoul
       # 허용하지 않은 Host 헤더로 접속하면 Homepage가 요청을 거부한다. 접속 주소가 바뀌면 같이 수정한다.
       HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS}
+
+networks:
+  # 앱 간 상태 확인용 공용 망. 서버에서 한 번만 만든다. (docker network create homeserver)
+  # 망이 없으면 컨테이너가 기동하지 않으므로 삭제하지 않는다.
+  homeserver:
+    external: true

@@ -7,6 +7,7 @@
 #
 # 사전 준비
 #   mkdir -p /data/apps/dockge/data
+#   docker network create homeserver   (공용 망, 서버에서 한 번만)
 name: dockge
 
 services:
@@ -19,6 +20,12 @@ services:
     ports:
       - "127.0.0.1:5001:5001"
 
+    # 공용 망 homeserver: Uptime Kuma·Homepage가 컨테이너 이름(dockge:5001)으로 상태를 확인한다.
+    # 프로젝트 전용 망(default)은 그대로 유지한다.
+    networks:
+      - default
+      - homeserver
+
     volumes:
       # Docker 데몬 제어용 소켓. 사실상 root 권한이므로 Dockge 화면 접근은 반드시 Tailscale로 제한한다.
       - /var/run/docker.sock:/var/run/docker.sock
@@ -30,3 +37,9 @@ services:
     environment:
       DOCKGE_STACKS_DIR: ${STACKS_DIR}
       TZ: Asia/Seoul
+
+networks:
+  # 앱 간 상태 확인용 공용 망. 서버에서 한 번만 만든다. (docker network create homeserver)
+  # 망이 없으면 컨테이너가 기동하지 않으므로 삭제하지 않는다.
+  homeserver:
+    external: true

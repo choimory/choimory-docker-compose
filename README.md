@@ -1,3 +1,36 @@
+# 목차
+
+- [intro](#intro)
+  - [docker run 대신 compose로 관리하는 이유](#docker-run-대신-compose로-관리하는-이유)
+  - [docker run 옵션과의 대응](#docker-run-옵션과의-대응)
+- [디렉토리 구조](#디렉토리-구조)
+- [choimory-server](#choimory-server)
+  - [개요](#개요)
+  - [서버 사양](#서버-사양)
+  - [앱 목록과 포트](#앱-목록과-포트)
+  - [네트워크 / 접근 규칙](#네트워크--접근-규칙)
+  - [디렉토리 / 데이터 규칙](#디렉토리--데이터-규칙)
+  - [compose 작성 규칙](#compose-작성-규칙)
+  - [배포 방법](#배포-방법)
+  - [앱별 참고](#앱별-참고)
+  - [백업](#백업)
+- [choimory-local](#choimory-local)
+  - [개요](#개요-1)
+  - [서비스 목록](#서비스-목록)
+  - [compose 작성 규칙](#compose-작성-규칙-1)
+  - [실행 방법](#실행-방법)
+  - [서비스별 참고](#서비스별-참고)
+- [choimory-dev](#choimory-dev)
+  - [개요](#개요-2)
+  - [서비스 목록](#서비스-목록-1)
+  - [구성](#구성)
+  - [앱 레포의 Docker 파일](#앱-레포의-docker-파일)
+  - [profiles](#profiles)
+  - [실행 방법](#실행-방법-1)
+  - [환경변수 (.env)](#환경변수-env)
+
+---
+
 # intro
 
 - 프로젝트들의 docker compose들을 관리
@@ -22,6 +55,7 @@
 | `postgres:16.15-bookworm` | `image: postgres:16.15-bookworm` |
 
 - 한 번 `up -d` 하면 `restart` 정책에 따라 재부팅 후에도 자동으로 뜸. `docker compose down`을 하면 컨테이너가 삭제되어 다시 `up -d` 필요
+  - choimory-dev는 개발할 때만 띄우는 용도라 `restart` 정책이 없음. 재부팅 후에는 다시 `up -d` 필요
 
 ---
 
@@ -39,11 +73,10 @@ choimory-docker-compose/
 │   └── mysql/
 └── choimory-server/       # 홈서버 미니PC의 개인용 앱 compose
     ├── dockge/            # compose.yaml, .env.example
-    ├── homepage/
-    ├── uptime-kuma/
+    ├── homepage/          # config/: Homepage 설정 원본
+    ├── uptime-kuma/       # disk-push.sh: 디스크 용량 Push 스크립트
     ├── jellyfin/
     ├── immich/
-    ├── filebrowser/
     ├── vaultwarden/
     ├── adguard-home/
     └── samba/             # 호스트 apt 설치, 설정 기록용 README.md만 존재
@@ -76,10 +109,9 @@ choimory-docker-compose/
 | Uptime Kuma | 서비스 감시, 알림 | `louislam/uptime-kuma:2.5.8` | 127.0.0.1:3001 | 3001 |
 | Jellyfin | 영상 스트리밍 | `jellyfin/jellyfin:12.4` | 0.0.0.0:8096 | - |
 | Immich | 사진 백업 | `ghcr.io/immich-app/immich-server:v3.3.5` 외 | 0.0.0.0:2283 | - |
-| File Browser | 웹 파일 접근 | `filebrowser/filebrowser:v2.63.23` | 0.0.0.0:8081 | - |
-| Vaultwarden | 비밀번호 관리자 | `vaultwarden/server:1.37.4` | 127.0.0.1:8080 | 8443 |
-| AdGuard Home (관리) | 광고 차단 DNS 관리 화면 | `adguard/adguardhome:v0.107.79` | 127.0.0.1:3002 | 3002 |
-| AdGuard Home (DNS) | 클라이언트 DNS | 위와 동일 | 0.0.0.0:53 (tcp/udp) | - |
+| Vaultwarden (보류) | 비밀번호 관리자 | `vaultwarden/server:1.37.4` | 127.0.0.1:8080 | 8443 |
+| AdGuard Home (관리, 보류) | 광고 차단 DNS 관리 화면 | `adguard/adguardhome:v0.107.79` | 127.0.0.1:3002 | 3002 |
+| AdGuard Home (DNS, 보류) | 클라이언트 DNS | 위와 동일 | 0.0.0.0:53 (tcp/udp) | - |
 | Samba | 네트워크 드라이브 | 호스트 apt 설치 | 445 | - |
 
 - Tailscale Funnel(인터넷 공개)은 사용하지 않음
@@ -90,6 +122,7 @@ choimory-docker-compose/
 - **LAN 기기도 쓰는 앱**(Jellyfin, Immich 등): `0.0.0.0`에 바인딩
   - 공유기 포트포워딩이 없어 인터넷에서는 접근할 수 없음
   - Docker가 공개한 포트는 ufw를 우회하므로 ufw로 막는 방식에 기대지 않음
+- **공용 Docker 망 `homeserver`**: Uptime Kuma, Homepage가 컨테이너 이름(`http://dockge:5001` 등)으로 다른 앱 상태를 확인함. `tailscale serve`는 컨테이너에서 온 요청을 받지 않아서 이 방식을 씀
 - **Jellyfin**: Cloudflare Tunnel로 노출하지 않음 (대용량 영상 전송은 Cloudflare 약관 문제 소지)
 - **AdGuard Home**
   - 서버의 systemd-resolved 스텁 리스너를 끄고, 서버 자신은 외부 DNS(1.1.1.1, 8.8.8.8)를 씀. AdGuard 장애 시에도 서버를 복구할 수 있게 하기 위함
@@ -100,17 +133,24 @@ choimory-docker-compose/
 
 | 경로 | 용도 |
 | --- | --- |
-| `/data/dev/repos/choimory-docker-compose` | 이 저장소 clone 위치. Dockge stacks 경로는 이 아래 `choimory-server` |
+| `/data/dev/choimory/repo/choimory-docker-compose` | 이 저장소 clone 위치. Dockge stacks 경로는 이 아래 `choimory-server` |
 | `/data/apps/<앱>/` | 앱별 설정, DB (bind mount) |
-| `/data/nas/media` | Jellyfin 미디어 (읽기 전용 마운트) |
-| `/data/nas/photos` | Immich 라이브러리 |
-| `/data/nas/files` | 개인 문서 (File Browser, Samba) |
+| `/data/storage/media` | Jellyfin 미디어 (읽기 전용 마운트) |
+| `/data/storage/photos` | Immich 라이브러리 |
+| `/data/storage/files` | 개인 문서 (Samba) |
 | `/data/backup` | 백업 스테이징 (DB 덤프 등) |
+| `/data/dev/choimory-dev/repo` | choimory-dev 프로젝트 저장소 clone 위치 |
+| `/data/dev/choimory-dev/k8s` | k3s PV 저장 위치 (`--default-local-storage-path`). choimory-dev의 DB, Redis 데이터가 PVC로 생성됨 |
+
+- `/data/dev`는 프로젝트 단위로 나눔 (`choimory`: 개인 저장소, `choimory-dev`: 토이프로젝트)
+- k3s DB 데이터는 PVC를 선언하면 local-path provisioner가 `pvc-<id>_<네임스페이스>_<PVC이름>` 폴더를 자동 생성하므로 별도 docker volume 경로를 두지 않음
+- k3s 저장 경로는 클러스터 전체 설정이라, 다른 프로젝트를 k3s에 올리면 그 PV도 `choimory-dev/k8s` 아래에 생김. 그때 경로 변경 또는 프로젝트별 StorageClass 분리를 검토
 
 - 코드(이 저장소)와 데이터(`/data/apps`)를 분리하고, compose에서는 절대경로로 bind mount 함
 - named volume은 쓰지 않음
-- `/data/nas`는 나중에 대용량 디스크(DAS)를 마운트할 자리라 앱 설정 변경 없이 디스크만 교체 가능
-- `/data/nas/photos`는 Immich가 관리하므로 File Browser와 Samba로 노출하지 않음
+- `/data/storage`는 앱이 보는 대용량 데이터 경로로 고정함. 실제 디스크(외장하드, 향후 DAS)는 `/mnt/<장치>`에 마운트하고 bind mount로 연결하므로, 디스크를 바꿔도 앱 설정은 그대로
+  - 이름을 `nas`, `das`처럼 장치 기준이 아니라 역할 기준으로 지은 이유와 마운트 구조는 `choimory-server/README.md`의 스토리지 / 마운트 구조 참고
+- `/data/storage/photos`는 Immich가 관리하므로 Samba로 노출하지 않음
 
 ## compose 작성 규칙
 
@@ -122,7 +162,7 @@ choimory-docker-compose/
 - `TZ: Asia/Seoul`
 - 실행 계정은 choimory:homeserver (`1000:1500`)
   - linuxserver 계열처럼 PUID/PGID를 지원하는 이미지는 환경변수로 지정함 (Homepage)
-  - 그 외 이미지는 `user: "1000:1500"`으로 지정함 (Jellyfin, File Browser, Vaultwarden)
+  - 그 외 이미지는 `user: "1000:1500"`으로 지정함 (Jellyfin, Vaultwarden)
   - Dockge, Uptime Kuma, Immich, AdGuard Home은 컨테이너 내부 root로 실행되어 생성 파일이 root 소유가 됨
 - 비밀번호, 토큰, 서버별 값은 `.env`로 분리함. `.env.example`만 커밋하고 `.env`는 gitignore 대상
 - compose 파일 상단 주석에 앱 용도, 접속 방법, 사전 준비 명령(`mkdir`, `tailscale serve`)을 적음
@@ -130,13 +170,13 @@ choimory-docker-compose/
 
 ## 배포 방법
 
-1. 서버의 `/data/dev/repos/`에 저장소 clone
+1. 서버의 `/data/dev/choimory/repo/`에 저장소 clone
 2. 앱 디렉토리에서 `.env.example`을 복사해 `.env` 작성
 3. compose 상단 주석의 사전 준비 명령 실행
    - bind mount 경로가 없으면 Docker가 root 소유로 디렉토리를 만들어, `user`로 실행하는 컨테이너가 권한 오류로 실패함
 4. `docker compose config`로 확인 후 `docker compose up -d`, 또는 Dockge 화면에서 기동
 
-권장 기동 순서: Dockge → Homepage, Uptime Kuma → Jellyfin → Immich, File Browser, Samba → Vaultwarden, AdGuard Home
+권장 기동 순서: Dockge → Homepage, Uptime Kuma → Jellyfin → Immich, Samba → Vaultwarden, AdGuard Home
 
 ## 앱별 참고
 
@@ -240,7 +280,7 @@ choimory-docker-compose/
 
 ## 구성
 
-- compose 파일 하나(`choimory-dev/compose.yaml`)에 모든 서비스를 두고, 모든 서비스에 profile을 닮
+- compose 파일 하나(`choimory-dev/compose.yaml`)에 모든 서비스를 두고, 모든 서비스에 profile을 붙임
   - profile이 없는 서비스는 어떤 profile을 줘도 항상 뜨므로, `db-only`처럼 일부만 띄우려면 모든 서비스에 profile이 필요함
   - `.env`의 `COMPOSE_PROFILES=all`을 기본값으로 둬서, profile 미지정 `up`/`down`이 전체를 대상으로 함
 - 특정 서비스 빼기는 profile 대신 `--scale <서비스>=0` 사용. 빼는 profile을 만들면 모든 서비스에 그 이름을 달아야 해서 조합이 늘어나기 때문
@@ -261,13 +301,13 @@ choimory-docker-compose/
 
 | 레포 | 파일 | 내용 |
 | --- | --- | --- |
-| choimory-dev-member-api | `Dockerfile` | `eclipse-temurin:21-jdk`에서 gradlew로 `:member-api:bootJar` → `eclipse-temurin:21-jre`로 실행. Gradle 의존성은 BuildKit 캐시 마운트로 재사용 |
+| choimory-dev-member-api | `Dockerfile` | `eclipse-temurin:21.0.13_9-jdk-noble`에서 gradlew로 `:member-api:bootJar` → `eclipse-temurin:21.0.13_9-jre-noble`로 실행. Gradle 의존성은 BuildKit 캐시 마운트로 재사용 |
 | choimory-dev-member-api | `.dockerignore` | 빌드 결과물, IDE, 문서 제외 (`docs/flyway`는 포함) |
-| choimory-dev-front | `Dockerfile` | `node:22-alpine`에서 의존성 설치, 빌드 → standalone 결과물만 실행 |
+| choimory-dev-front | `Dockerfile` | `node:22.23.4-alpine`에서 의존성 설치, 빌드 → standalone 결과물만 실행 |
 | choimory-dev-front | `.dockerignore` | `node_modules`, `.next`, `env/`, `.env*` 등 제외 |
 | choimory-dev-front | `next.config.ts` | `output: "standalone"` |
 
-- 이미지 태그는 패치 버전까지 고정함 (`eclipse-temurin:21.0.13_9-*-noble`, `node:22.23.4-alpine`)
+- 이미지 태그는 패치 버전까지 고정함
 
 ## profiles
 
@@ -285,7 +325,7 @@ choimory-docker-compose/
 ## 실행 방법
 
 1. `cd choimory-dev`
-2. `cp .env.example .env` 후 `changeme`를 실제 값으로 변경. `JWT_SECRET`은 32바이트 이상 (`openssl rand -base64 48`)
+2. `cp .env.example .env` 후 `changeme`를 실제 값으로 변경. `JWT_SECRET`은 32바이트 이상 (`openssl rand -base64 48`). `COMPOSE_PROFILES`(기본 모드)와 `MEMBER_API_CONTEXT`, `FRONT_CONTEXT`(레포 위치)도 확인
 3. 개발 패턴에 맞게 기동
 
 | 개발 패턴 | 명령 | 뜨는 것 |
@@ -296,6 +336,8 @@ choimory-docker-compose/
 | 백엔드 전부 IDE + 프론트는 컨테이너 | `docker compose --profile db-only --profile front-only up -d` | postgres, redis, front |
 | 특정 백엔드만 IDE, 나머지는 컨테이너 | `docker compose up -d --scale member-api=0` | member-api만 빼고 전부 |
 | 종료 (모든 경우) | `docker compose down` | - |
+
+- 종료를 그냥 `docker compose down`으로 하는 것은 `.env`의 `COMPOSE_PROFILES`가 `all`일 때 기준. 다른 값(예: `db-only`)으로 바꿨다면 그 profile 범위만 정리되므로, 전체를 띄웠을 때는 `docker compose --profile all down`으로 정리
 
 ```bash
 # 특정 서비스 빼기: 여러 개는 이어 쓰고, profile과 같이 쓸 수도 있음
@@ -336,4 +378,4 @@ docker compose down --rmi local
 | `MEMBER_API_CONTEXT` | `../../../choimory-dev/choimory-dev-member-api` | member-api 레포 위치 (`build.context`). 필수 값 |
 | `FRONT_CONTEXT` | `../../../choimory-dev/choimory-dev-front` | front 레포 위치 (`build.context`). 필수 값 |
 
-- postgres 계정과 database는 데이터 디렉토리가 비어 있을 때(최초 기동)만 적용됨
+- postgres 계정과 database는 데이터 디렉토리가 비어 있을 때(최초 기동)만 적용됨. 이후 바꾸려면 데이터 디렉토리 삭제 또는 `ALTER USER` (이미지 삭제나 `--build`로는 바뀌지 않음. `choimory-dev/README.md`의 문제 해결 참고)
