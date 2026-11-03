@@ -389,6 +389,9 @@ cp /data/dev/choimory/repo/choimory-docker-compose/choimory-server/homepage/conf
 ## Uptime Kuma
 
 - 모니터는 공용 망 `homeserver`의 컨테이너 이름으로 등록함
+- 모니터 추가용 공식 명령어가 없어 웹 화면에서 등록함. 모니터 설정은 `/data/apps/uptime-kuma/data`에 저장되므로 이 폴더를 백업하면 복구됨
+- 공통값: 하트비트 주기 60초, 재시도 2, 재시도 주기 20초, Domain Name Expiry Notification 해제 (내부 이름은 공인 도메인이 아니라 확인 불가), 나머지 기본값
+  - 재시도 때문에 꺼지면 대기(Pending) 상태를 거쳐 약 1분 뒤 다운(Down)이 되고, 알림은 다운이 된 순간에만 감
 
 | 모니터 | 종류 | 대상 | 비고 |
 | --- | --- | --- | --- |
@@ -397,7 +400,7 @@ cp /data/dev/choimory/repo/choimory-docker-compose/choimory-server/homepage/conf
 | Jellyfin | HTTP(s) - 키워드 | `http://jellyfin:8096/health` | 키워드 `Healthy` |
 | Immich | HTTP(s) - 키워드 | `http://immich_server:2283/api/server/ping` | 키워드 `pong` |
 | Samba | TCP 포트 | `192.168.10.201` : `445` | 호스트 서비스라 LAN IP로 확인 |
-| 디스크 용량 | Push | 서버 cron이 5분마다 보고 | 하트비트 간격 600초 |
+| 디스크 용량 | Push | 서버 cron이 5분마다 보고 | 하트비트 주기 600초, 재시도 0 |
 
 ### 디스크 용량 감시
 
@@ -409,10 +412,25 @@ cp /data/dev/choimory/repo/choimory-docker-compose/choimory-server/homepage/conf
 # 스크립트 직접 실행해 보기 (Push URL은 Uptime Kuma Push 모니터 화면에서 ? 앞부분만 복사)
 /data/dev/choimory/repo/choimory-docker-compose/choimory-server/uptime-kuma/disk-push.sh 'http://127.0.0.1:3001/api/push/<토큰>' 80 /
 
-# choimory 계정 crontab에 5분마다 실행 등록
-crontab -e
-# */5 * * * * /data/dev/choimory/repo/choimory-docker-compose/choimory-server/uptime-kuma/disk-push.sh 'http://127.0.0.1:3001/api/push/<토큰>' 80 /
+# choimory 계정 crontab에 5분마다 실행하도록 한 줄 추가 (편집기 없이)
+(crontab -l 2>/dev/null; echo "*/5 * * * * /data/dev/choimory/repo/choimory-docker-compose/choimory-server/uptime-kuma/disk-push.sh 'http://127.0.0.1:3001/api/push/<토큰>' 80 /") | crontab -
+
+# 등록 확인
+crontab -l
+
+# cron이 실제로 돌았는지 확인
+journalctl -u cron --since "15 min ago" --no-pager | grep disk-push
 ```
+
+- 하트비트 주기 600초라 5분 보고가 한 번 빠져도 괜찮고, 두 번 연속 안 오면 다운
+- Push 모니터 화면의 주소는 `https://choimory-server.<tailnet>.ts.net:3001/...`로 보이지만 서버 안에서는 `http://127.0.0.1:3001`로 보냄
+
+### 알림 (디스코드)
+
+- 개인 디스코드 서버의 알림 전용 채널에 웹후크를 만들어 연결함. 웹후크 URL은 비밀값이라 저장소에 적지 않음
+- 설정 → 알림 → 알림 설정: 종류 `Discord`, 웹후크 URL, Message Format `Normal (rich embeds)`
+- **기본적으로 활성화**, **기존 모니터에 모두 적용**을 반드시 켬. 빠지면 테스트 메시지만 오고 모니터 다운 알림은 가지 않음
+- 디스코드는 데스크톱 앱 사용 중에는 폰으로 푸시를 보내지 않음. 데스크톱 사용자 설정 → 알림 → 푸시 알림 비활성 시간 제한을 짧게 하고, 폰에서 서버 알림을 "모든 메시지"로 설정
 
 - AdGuard Home은 HTTP가 아닌 DNS 모니터 타입으로 `<Tailscale IP>:53`을 감시해야 실제 DNS 응답을 확인할 수 있음
 
