@@ -158,7 +158,9 @@ sudo ufw allow from 100.64.0.0/10 to any app Samba
 
 ## 윈도우
 
-- 파일 탐색기 주소창에 `\\192.168.10.201` 입력 → 계정 `choimory`, Samba 비밀번호로 로그인
+- 파일 탐색기 주소창에 `\\192.168.10.201`(집 LAN) 또는 `\\choimory-server`(Tailscale, 집·밖 동일) 입력 → 계정 `choimory`, Samba 비밀번호로 로그인
+- 윈도우는 `smb://` 주소를 모름. `smb://choimory-server`를 열면 "앱을 다운로드하여 이 'smb' 링크를 여세요"가 뜨므로 `\\` 형식으로 입력한다.
+- 데스크톱, ROG Xbox Ally X 모두 같은 방식
 - `files`, `media` 두 개만 보이는 것이 정상이다.
 - 자주 쓰면 공유 폴더 우클릭 → 네트워크 드라이브 연결로 드라이브 문자를 붙인다.
 

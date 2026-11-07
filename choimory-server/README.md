@@ -154,7 +154,7 @@ docker network inspect homeserver --format '{{range .Containers}}{{.Name}} {{end
 ## Tailscale 클라이언트 서브넷 경로
 
 - 서버는 서브넷 라우터로 `192.168.10.0/24`를 광고함 (밖에서 Tailscale이 없는 집 기기에 접속하는 용도)
-- 집 LAN 안에서 쓰는 기기(데스크톱, 맥북)는 서브넷 경로를 받지 않음: `tailscale set --accept-routes=false`
+- 집 LAN 안에서 쓰는 기기(데스크톱, 맥북, ROG Xbox Ally X)는 서브넷 경로를 받지 않음: `tailscale set --accept-routes=false`
   - 맥북도 `true`면 집 와이파이에서 같은 헤어핀이 생겨 매우 느렸고, `false`로 바꾼 뒤 정상
   - 받아들이면 Tailscale 통신 경로가 꼬여 공유기 밖 공인 IP로 나갔다 들어오는 헤어핀이 생기고, 동영상 스트리밍처럼 대용량 전송이 크게 느려짐
   - 끄면 LAN 주소는 랜으로 바로, Tailscale 주소도 집 안 직접 연결(`tailscale ping`이 `via 192.168.10.201:41641`)
@@ -506,6 +506,7 @@ docker exec -it jellyfin /usr/lib/jellyfin-ffmpeg/vainfo --display drm --device 
 | 데스크톱 (유선) | false | 브라우저, LAN 또는 Tailscale 주소 | 원본 (다이렉트 재생) |
 | 맥북 (와이파이, 외출) | false | 브라우저, Tailscale 주소 | 자동 또는 FHD~2K |
 | 아이패드 (와이파이) | 기본값 | 크롬, Tailscale 주소 | FHD~2K |
+| ROG Xbox Ally X (와이파이, 윈도우 휴대 게임기) | false (권장) | 브라우저, Tailscale 주소 | 자동 또는 FHD (화면이 1080p) |
 | 밖 (LTE, 핫스팟) | - | Tailscale 주소 | 1080p 8~10Mbps 이하 |
 
 - 와이파이 기기는 원본(게임 녹화 약 100Mbps)을 꾸준히 받기 버거우므로 화질을 낮춤. 낮추면 서버 GPU가 해상도를 낮춰 변환해 여유 있게 따라감
